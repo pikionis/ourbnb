@@ -1,0 +1,313 @@
+# BUILD_PLAN.md — KosPM
+
+Build order follows value and risk: **operations first** (v1), then **guests** (v2), then **money,
+compliance and portals** (v3). Each phase ends with working, tested, deployable software.
+
+Work one phase per session. Tick boxes as tasks finish. Business rules: `docs/DOMAIN.md`.
+Rules for how to code: `CLAUDE.md`.
+
+---
+
+## Target repository layout
+
+```
+kospm/
+  CLAUDE.md
+  Makefile
+  docker-compose.yml            # local dev: postgres, backend
+  .env.example
+  docs/
+    DOMAIN.md
+    BUILD_PLAN.md
+    adr/                        # 0001-modular-monolith.md, 0002-django-plus-pure-domain.md, ...
+  backend/
+    pyproject.toml              # uv-managed
+    manage.py
+    config/                     # settings (base/dev/prod), urls, wsgi
+    src/kospm/
+      shared/
+        domain/                 # Money, Entity/Aggregate base, DomainEvent, Command, ids
+        messagebus.py           # in-process bus (Cosmic Python ch. 8–10)
+        unit_of_work.py         # abstract UoW + DjangoUnitOfWork
+        clock.py                # Clock port, SystemClock, FixedClock (tests)
+        outbox/                 # outbox model + worker
+        adapters/crypto.py      # Fernet encryption helpers
+      properties/
+      reservations/
+      housekeeping/
+      messaging/                # WhatsApp adapter, templates, webhook
+      guests/                   # v2
+      local_guide/              # v2
+      finance/                  # v3
+      compliance/               # v3
+      owner_portal/             # v3 (read models + API)
+      bootstrap.py              # wires handlers, repos, adapters (Cosmic Python ch. 13)
+    tests/
+      unit/  integration/  e2e/  fixtures/   # fixtures/ical/*.ics, fixtures/whatsapp/*.json
+  frontend/
+    owner-portal/               # v3, React + Vite + TypeScript
+  website/                      # v3, Next.js public site
+  deploy/
+    docker-compose.prod.yml
+    Caddyfile
+    backup.sh
+    crontab                     # scheduled jobs
+```
+
+## Key technical choices (record each as an ADR in phase 0)
+
+| # | Decision | Choice |
+|---|---|---|
+| 0001 | Style | Modular monolith, DDD + hexagonal |
+| 0002 | Backend | Python 3.12, Django 5, Django Ninja for JSON API, domain in pure Python |
+| 0003 | Database | PostgreSQL 16 |
+| 0004 | Background work | Management commands run by a scheduler container (supercronic); outbox worker every minute. No Celery/Redis in v1 |
+| 0005 | Messaging | In-process synchronous message bus + transactional outbox for external side effects |
+| 0006 | Back-office | Django admin (Greek/English) for admin user |
+| 0007 | Cleaner UI | Server-rendered Django pages behind signed links (no login, no app). React not needed here |
+| 0008 | Owner portal | React + Vite + TS (v3) against Django Ninja API |
+| 0009 | Public website | Next.js (v3) for SEO, reading a small public API |
+| 0010 | Hosting | Existing Hostinger VPS, Docker Compose, Caddy (auto HTTPS), daily off-site Postgres backup |
+| 0011 | WhatsApp | Meta WhatsApp Cloud API; templates versioned in code |
+| 0012 | Data sources | iCal + manual entry + CSV uploads only. No scraping, no stored third-party passwords |
+| 0013 | Tooling | uv, ruff, mypy, pytest, import-linter, GitHub Actions CI |
+
+---
+
+# v1 — Operations
+
+## Phase 0 — Repository, tooling, skeleton
+- [ ] Monorepo layout as above; `backend/` with uv, Django 5 project `config`, package `src/kospm`.
+- [ ] Settings split `base/dev/prod`, all secrets from env; `.env.example` documented.
+- [ ] `docker-compose.yml` with Postgres 16 and backend (hot reload).
+- [ ] ruff, mypy (strict for `*/domain/*`, `*/service_layer/*`), pytest + pytest-django, import-linter
+      contracts expressing the dependency rules in `CLAUDE.md`.
+- [ ] `Makefile` targets: up, test, test-all, check, migrate, run-jobs.
+- [ ] GitHub Actions CI running `make check` with a Postgres service.
+- [ ] ADRs 0001–0013 written (one short file each: context, decision, consequences).
+- [ ] Django admin enabled, languages `el` and `en`, `TIME_ZONE="Europe/Athens"`, `USE_TZ=True`.
+
+**Done when:** `make check` is green on an empty test, CI passes, admin login works locally.
+
+## Phase 1 — Shared kernel
+- [ ] `Money` value object (Decimal, EUR, add/sub/multiply by Decimal, `percent()`, rounding half-up,
+      no float accepted — raises `TypeError`).
+- [ ] `DomainEvent`, `Command` base dataclasses; `Aggregate` base with `events: list[DomainEvent]`.
+- [ ] `Clock` port with `SystemClock` and `FixedClock`; helpers for Athens local date/time.
+- [ ] `AbstractUnitOfWork`, `DjangoUnitOfWork` (transaction.atomic, collects events from seen aggregates).
+- [ ] `MessageBus` handling commands (one handler) and events (many handlers), with retries for events.
+- [ ] `bootstrap.py` wiring with dependency injection (Cosmic Python ch. 13); tests bootstrap with fakes.
+- [ ] Outbox: `OutboxMessage` model (id, channel, recipient, template, payload, status, attempts,
+      created_at, sent_at), `enqueue()` inside UoW, `process_outbox` management command with
+      exponential backoff. Sender is a port (`ConsoleSender` in dev, WhatsApp in phase 6).
+- [ ] Fernet crypto helper + `EncryptedTextField` for Django models.
+
+**Tests:** Money arithmetic and rounding; bus routes events to all handlers; UoW rolls back on
+exception; outbox retries and marks failures after N attempts.
+
+## Phase 2 — Properties context
+Domain (`properties/domain/`):
+- [ ] `Owner` (id, name, email, phone, afm, iban, show_on_website=False).
+- [ ] `Contract` value object (commission_rate 0.15, owner_cleaning_charge 40.00, signed_at, document_url).
+- [ ] `Property` aggregate with states `DRAFT → PENDING_LEGAL → ACTIVE → SUSPENDED/OFFBOARDED`,
+      `CheckInGuide`, `Amenities`, `ical_feeds`, `preferred_cleaner_id`, `linen_par_level=3`, lat/lng.
+- [ ] Methods: `complete_profile()`, `sign_contract()`, `record_sublease_declaration()`,
+      `assign_ama()`, `activate()` (enforces invariant, raises `PropertyNotReadyForActivation(missing=[...])`).
+- [ ] Events: `OwnerRegistered`, `PropertyProfileCompleted`, `ContractSigned`, `SubleaseDeclared`,
+      `AmaAssigned`, `PropertyActivated`.
+
+Service layer & adapters:
+- [ ] Commands + handlers for each step; `DjangoPropertyRepository`.
+- [ ] Django admin: Owners (inline properties), Properties (fieldsets per onboarding step, status
+      badge, "Activate" admin action showing missing items), lockbox code stored encrypted and masked.
+- [ ] Handler on `PropertyActivated` → flag owner to be asked for website consent (v3 shows it).
+
+**Tests:** activation fails listing each missing item; activation succeeds when all present; state
+transitions are one-way; one owner with many properties.
+
+## Phase 3 — Reservations context & iCal sync
+Domain:
+- [ ] `Reservation` aggregate (see DOMAIN §6), `Channel` enum, overlap check as domain service
+      `ReservationCalendar(property_id).accept(reservation)` raising `OverlappingReservation`.
+- [ ] Events `ReservationImported`, `ReservationRescheduled`, `ReservationCancelled`, `StayEnded`,
+      `CalendarEventNeedsReview`.
+- [ ] `CalendarDiff` domain service: given stored reservations and imported events → list of events
+      (new / rescheduled / cancelled). Pure function, heavily unit-tested.
+
+Adapters:
+- [ ] `ICalFetcher` port; `HttpICalFetcher` (httpx, timeout, ETag support) and `FileICalFetcher` (tests).
+- [ ] `ICalParser` (library `icalendar`) → `ImportedCalendarEvent`; per-channel classifiers
+      (`AirbnbClassifier`, `BookingClassifier`) deciding reservation vs block vs unknown.
+- [ ] Management command `sync_calendars` (all active properties); scheduled every 30 min.
+- [ ] Management command `emit_stay_ended` daily at 12:00 Athens.
+- [ ] Admin: reservations list with filters (property, channel, dates, status), manual create/edit
+      (channel DIRECT), "review queue" for unclassified calendar events, edit check-in/out times.
+
+**Tests (fixtures in `tests/fixtures/ical/`):** first import creates reservations; second identical
+import emits nothing (idempotent); changed dates → rescheduled; removed future event → cancelled;
+removed past event → no cancellation; overlap → alert, not saved; block events ignored; unknown →
+review queue; check-out day may equal next check-in day.
+
+## Phase 4 — Housekeeping domain (core algorithm, pure TDD)
+Everything here is pure Python, no Django. This is the heart of v1.
+- [ ] `TeamMember` (id, name, kind CLEANER/STANDBY, daily_limit, escalation_order, phone, language).
+- [ ] `EscalationPolicy` (target_per_cleaner=2, max_cleaner_normal=3, emergency_limit=4,
+      standby order) — configuration object.
+- [ ] `CleaningWindow` (11:00–15:00), configurable.
+- [ ] `CleaningTask` (DOMAIN §9) + `TaskPriority` classification P1–P5 from deadline vs day.
+- [ ] `CleaningTaskDeriver`: from a property's reservations → tasks with `available_from` and
+      `deadline`; recompute on import/reschedule/cancel (pure function, returns add/update/remove).
+- [ ] `plan_day(day, tasks, team, policy, preferences, allow_emergency=False) -> DailySchedule`.
+- [ ] `DailySchedule` aggregate with invariants (limits, no duplicates, unassigned mandatory → alert).
+- [ ] `forecast_overload(days, tasks, team, policy) -> list[OverloadWarning]`.
+- [ ] `LinenStock` aggregate + `RestockPlanner.urgency(stock, upcoming_checkouts, horizon=3)`.
+- [ ] `Issue` aggregate: `REPORTED → APPROVED | REJECTED → RESOLVED`; `approve(cost, owner_visible)`.
+
+**Required test scenarios for `plan_day`** (write them first, as a table-driven test file):
+1. 4 mandatory tasks, 2 cleaners → 2+2, no standby used.
+2. 3 mandatory tasks → 2+1 (balance), never 3+0.
+3. 5 mandatory → 2+2 + Mother gets 1.
+4. 7 mandatory → 2+2 + Mother 2 + Third 1.
+5. 9 mandatory → 2+2 + Mother 2 + Third 1 + Petros 2.
+6. 11 mandatory → standby full, then cleaners' 3rd → 3+3.
+7. 12 mandatory, `allow_emergency=False` → 1 UNASSIGNED + alert; with `True` → a cleaner gets a 4th.
+8. Early check-in task is sequence 1 for its assignee.
+9. Late check-in task may be scheduled after 15:00 and does not consume a 11–15 slot when others need it.
+10. Flexible (check-in tomorrow) task: assigned today only if a cleaner has < 2; never to standby; else
+    rolls to tomorrow.
+11. Empty-after task (P5) goes last and rolls over when the day is full.
+12. Preferred cleaner gets her property when balance allows; balance wins over preference.
+13. Task with `available_from` after the window (late check-out) is not scheduled before it.
+14. Deterministic output: same input → same schedule (stable sorting by deadline, then property code).
+
+**Other tests:** deriver handles back-to-back stays, gaps, cancellations, reschedules; overload
+forecast warns at capacity − 1; restock urgency urgent/normal/none cases.
+
+## Phase 5 — Housekeeping application layer
+- [ ] ORM models + repositories for tasks, schedules, team, linen stock, issues, restocks.
+- [ ] Event handlers: `ReservationImported/Rescheduled/Cancelled` → re-derive tasks for that property
+      → if affected day is already published → re-plan and enqueue "schedule changed" to affected people.
+- [ ] Command `plan_tomorrow` at 18:00 Athens: plan D+1, persist, enqueue one WhatsApp per person with
+      their list and one signed link per task.
+- [ ] Command `forecast_overload` daily 08:00 → admin alert (WhatsApp/email to admin) for next 30 days,
+      with suggested properties to set "closed to arrival".
+- [ ] Cleaner task page `/c/<signed-token>/` (Django `TimestampSigner`, valid until end of planned
+      day + 1): property name, Google Maps link, time slot + reason, lockbox code only on planned date,
+      checklist, big **Done** and **Report problem** (photo upload + text). Greek/English toggle,
+      mobile-first, no login. Rate-limited.
+- [ ] `complete_cleaning(task_id)` → `CleaningCompleted` → linen −1; (v2 adds guest "home ready").
+- [ ] `report_issue(task_id, photo, text)` → `IssueReported` → admin notified.
+- [ ] Admin: today/tomorrow board per person, manual reassignment (re-validates invariants), team &
+      policy config, issues approve/reject with cost, linen stock, record restock.
+- [ ] Restock list for driver: urgent/normal properties ordered by a route (nearest-neighbour from a
+      configurable start point using lat/lng) + one Google Maps directions link with waypoints.
+      Routing is a port (`RoutePlanner`) so a real optimiser can replace it later.
+
+**Done when:** with fixtures for 10 properties and 2 weeks of reservations, running `run-jobs`
+produces correct schedules, the cleaner page completes tasks, stock decreases, and the admin board
+shows everything.
+
+## Phase 6 — WhatsApp messaging adapter
+- [ ] `MessageSender` port; `WhatsAppCloudSender` (Graph API, token from env), `ConsoleSender` (dev).
+- [ ] `templates.py`: template names, languages (el, en), parameter order — cleaner daily schedule,
+      schedule changed, admin overload alert, admin issue reported. Script `whatsapp_sync_templates`
+      to create/update templates via API (run manually by Petros with his token).
+- [ ] Inbound webhook `/webhooks/whatsapp/`: verify token handshake, validate `X-Hub-Signature-256`,
+      store raw message, emit `InboundMessageReceived` (used by guests context in v2).
+- [ ] Respect the 24 h customer-service window: free text only inside it, templates otherwise.
+- [ ] Outbox worker uses the WhatsApp sender in prod.
+
+**Tests:** template parameter rendering; signature validation accepts/rejects; webhook idempotency
+(same message id twice → one event); outbox chooses template vs free text by window.
+
+## Phase 7 — Deploy v1 to the VPS
+- [ ] `deploy/docker-compose.prod.yml`: postgres (volume), backend (gunicorn), scheduler
+      (supercronic with `deploy/crontab`), Caddy reverse proxy with automatic HTTPS. Isolated network
+      and ports so the existing app on the VPS is not affected.
+- [ ] `deploy/backup.sh`: nightly `pg_dump`, encrypted, uploaded off-site (S3-compatible, e.g.
+      Backblaze B2); keep 30 daily / 12 monthly; documented restore test.
+- [ ] Health endpoint, structured logging, error reporting (Sentry free tier, optional).
+- [ ] `docs/RUNBOOK.md`: deploy, rollback, restore, rotate secrets, add a property, add a team member.
+- [ ] Production smoke test: real iCal of one property, plan tomorrow, receive WhatsApp on test phone.
+
+### v1 acceptance
+Admin onboards properties, calendars sync automatically, cleaners receive tomorrow's plan on WhatsApp
+at 18:00, open their links, mark Done, report problems; admin sees overload warnings, linen stock and
+the restock route.
+
+---
+
+# v2 — Guests
+
+## Phase 8 — Guests context
+- [ ] `GuestStay` aggregate per reservation, states per DOMAIN §7; created on `ReservationImported`.
+- [ ] `GuestMatcher` domain service: property code + check-in date → match / none / ambiguous.
+- [ ] Conversation state machine driving the bot: confirm name/dates → ask ID → send check-in info →
+      offer local guide. Admin escalation on ambiguity.
+- [ ] Guest ID stored encrypted (only declaration fields); lockbox release invariant (≥ ID_VERIFIED and
+      on/after arrival day from configurable hour).
+- [ ] Messages: welcome, check-in info (with photos), "home ready" on `CleaningCompleted`, check-out
+      reminder (evening before), review request (day after).
+- [ ] Early check-in / late check-out requests → admin approval → `ReservationTimesChanged` →
+      housekeeping re-plans.
+- [ ] Admin inbox: conversations, escalations, take-over (pause bot for a guest).
+- [ ] Copy-paste listing text → AI extracts amenities into `Amenities` for admin review.
+
+## Phase 9 — AI assistant adapter & local guide
+- [ ] `LocalGuideEntry` model + admin, categories per DOMAIN §8.
+- [ ] `GuestAssistant` port; `ClaudeGuestAssistant` adapter (Anthropic API, model configurable).
+      Context = amenities, non-secret guide fields, local guide entries, reservation facts.
+      Tools exposed to the model are read-only lookups plus *proposals* (`propose_early_checkin`,
+      `escalate_to_admin`). It never receives the lockbox code.
+- [ ] Human-like reply delay (configurable range), language matching (el/en at minimum).
+- [ ] Evaluation set: 30 typical guest questions with expected behaviour (answer / escalate);
+      run as a test with a recorded/fake model in CI and against the real model manually.
+
+### v2 acceptance
+A guest who taps the link in the platform message is identified, verified, receives check-in info on
+arrival day, gets recommendations, and is told when the home is ready; uncertain cases reach the admin.
+
+---
+
+# v3 — Money, compliance, portals
+
+## Phase 10 — Finance
+- [ ] `BookingStatement` per reservation (DOMAIN §10) with line items; `CommissionPolicy` from contract.
+- [ ] Platform payout CSV import (Airbnb, Booking) → actual platform fees per reservation; mismatches to
+      a review queue.
+- [ ] `OwnerCharge` from approved issues; cleaning charge per completed cleaning.
+- [ ] `OwnerPayout` monthly by check-out month; `CALCULATED → APPROVED → PAID`; command
+      `calculate_payouts --month YYYY-MM`.
+- [ ] Climate resilience fee as pass-through, rates per season in config.
+- [ ] Accounting export CSV per month, emailed to the accountant.
+
+**Acceptance test:** the worked example in DOMAIN §10 (owner 660.00 €, IKE 168.50 €); cancellation with
+payment; stay spanning two months belongs to the check-out month; owner with 3 properties gets one payout.
+
+## Phase 11 — Compliance
+- [ ] `StayDeclaration` per stay, `DeclarationDue` with deadline = 20th of the month after check-out.
+- [ ] `AmendmentRequired` on cancellation after submission.
+- [ ] Monthly export for manual submission; admin marks submitted with AADE reference.
+- [ ] Deadline reminders; retention purge job for guest identity data.
+
+## Phase 12 — Owner portal
+- [ ] Owner authentication (email + password via Django auth, password reset).
+- [ ] Read-model API (Django Ninja): properties & onboarding status, reservations, statements, payouts,
+      approved charges, documents, website consent toggle.
+- [ ] React + Vite + TS app, Greek/English, mobile-friendly.
+
+## Phase 13 — Public website
+- [ ] Next.js site (Greek/English): services, how it works, pricing model, contact form.
+- [ ] Public API: count of managed properties, owners with `show_on_website=True` (name/logo),
+      testimonials (admin-managed).
+- [ ] SEO basics: metadata, sitemap, Open Graph, local business schema for Kos.
+
+---
+
+## Backlog / later
+- WhatsApp templates content (Greek/English) — to be written with Petros.
+- Viber channel adapter.
+- Channel manager adapter (if volume grows).
+- Optimised multi-stop routing service.
+- Partner commissions from local guide.
+- Automated AADE submission (only through an official interface, if one becomes available).
