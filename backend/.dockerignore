@@ -1,0 +1,23 @@
+# Keep the build context small and free of host artefacts and secrets.
+# "**/x" matches x at any depth, including the context root (backend/).
+
+# Virtualenvs (the image builds its own in /opt/venv)
+**/.venv
+
+# Python bytecode and tool caches
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.import_linter_cache
+.coverage
+htmlcov
+
+# Local data
+staticfiles
+media
+
+# Secrets: never baked into an image
+**/.env
+**/.env.*

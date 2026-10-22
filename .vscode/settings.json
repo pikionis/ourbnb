@@ -2,6 +2,8 @@
   "files.eol": "\n",
   "editor.formatOnSave": true,
   "[python]": { "editor.defaultFormatter": "charliermarsh.ruff" },
+  "python.defaultInterpreterPath": "backend/.venv/Scripts/python.exe",
   "python.testing.pytestEnabled": true,
-  "python.testing.pytestArgs": ["backend/tests"]
+  "python.testing.cwd": "backend",
+  "python.testing.pytestArgs": ["tests"]
 }

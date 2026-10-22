@@ -77,15 +77,15 @@ kospm/
 # v1 — Operations
 
 ## Phase 0 — Repository, tooling, skeleton
-- [ ] Monorepo layout as above; `backend/` with uv, Django 5 project `config`, package `src/kospm`.
-- [ ] Settings split `base/dev/prod`, all secrets from env; `.env.example` documented.
-- [ ] `docker-compose.yml` with Postgres 16 and backend (hot reload).
-- [ ] ruff, mypy (strict for `*/domain/*`, `*/service_layer/*`), pytest + pytest-django, import-linter
+- [x] Monorepo layout as above; `backend/` with uv, Django 5 project `config`, package `src/kospm`.
+- [x] Settings split `base/dev/prod`, all secrets from env; `.env.example` documented.
+- [x] `docker-compose.yml` with Postgres 16 and backend (hot reload).
+- [x] ruff, mypy (strict for `*/domain/*`, `*/service_layer/*`), pytest + pytest-django, import-linter
       contracts expressing the dependency rules in `CLAUDE.md`.
-- [ ] `Makefile` targets: up, test, test-all, check, migrate, run-jobs.
-- [ ] GitHub Actions CI running `make check` with a Postgres service.
-- [ ] ADRs 0001–0013 written (one short file each: context, decision, consequences).
-- [ ] Django admin enabled, languages `el` and `en`, `TIME_ZONE="Europe/Athens"`, `USE_TZ=True`.
+- [x] `Makefile` targets: up, test, test-all, check, migrate, run-jobs.
+- [x] GitHub Actions CI running `make check` with a Postgres service.
+- [x] ADRs 0001–0013 written (one short file each: context, decision, consequences).
+- [x] Django admin enabled, languages `el` and `en`, `TIME_ZONE="Europe/Athens"`, `USE_TZ=True`.
 
 **Done when:** `make check` is green on an empty test, CI passes, admin login works locally.
 

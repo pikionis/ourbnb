@@ -1,0 +1,63 @@
+# CI: one job that runs exactly what developers run locally -- `make check`
+# (ruff, ruff format --check, mypy --strict, import-linter, migrations check,
+# and the full pytest suite including Postgres integration tests).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: make check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: kospm
+          POSTGRES_PASSWORD: kospm
+          POSTGRES_DB: kospm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kospm -d kospm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Throwaway credentials of the CI service container above; not a secret.
+      DATABASE_URL: postgres://kospm:kospm@localhost:5432/kospm
+      PYTHONUTF8: "1"
+
+    # Actions are pinned to full commit SHAs (tags can be moved; setup-uv
+    # publishes no floating "v10" tag at all). Bump SHA and comment together.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.13.5" # same uv as local dev and backend/Dockerfile
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync --locked
+
+      - name: make check
+        run: make check
