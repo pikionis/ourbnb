@@ -70,4 +70,4 @@ superuser:
 
 ## Scheduled jobs, run once (iCal sync, plan tomorrow, process outbox)
 run-jobs:
-	@echo no scheduled jobs yet - process_outbox arrives in Phase 1
+	$(MANAGE) process_outbox

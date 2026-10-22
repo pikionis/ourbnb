@@ -33,6 +33,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # Shared kernel
+    "kospm.shared.outbox",
     # Bounded contexts
     "kospm.identity",
 ]
@@ -76,6 +78,20 @@ TEMPLATES = [
 # published for work that is later rolled back with the request.
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- Outbox (ADR 0005): external messages are delivered by the process_outbox worker -----------
+# Configuration, not constants (CLAUDE.md): bootstrap turns these into an OutboxRetryPolicy.
+
+# Which MessageSender delivers: "console" prints messages (dev); WhatsApp arrives in Phase 6.
+OUTBOX_SENDER = env.str("OUTBOX_SENDER", default="console")
+# Failed attempts before a message is marked FAILED for the admin.
+OUTBOX_MAX_ATTEMPTS = env.int("OUTBOX_MAX_ATTEMPTS", default=5)
+# Exponential backoff: 60 s, then x2 per failure, capped at one hour.
+OUTBOX_BASE_DELAY_SECONDS = env.int("OUTBOX_BASE_DELAY_SECONDS", default=60)
+OUTBOX_BACKOFF_FACTOR = env.int("OUTBOX_BACKOFF_FACTOR", default=2)
+OUTBOX_MAX_DELAY_SECONDS = env.int("OUTBOX_MAX_DELAY_SECONDS", default=3600)
+# Messages handled per worker run (the scheduler runs it every minute, ADR 0004).
+OUTBOX_BATCH_SIZE = env.int("OUTBOX_BATCH_SIZE", default=100)
 
 # --- Authentication ----------------------------------------------------------------------------
 

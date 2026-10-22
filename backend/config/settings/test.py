@@ -12,6 +12,17 @@ from config.settings.base import *
 
 SECRET_KEY = "kospm-test-settings-not-a-secret"  # used only by the test suite
 
+# Test-only apps (tables created without migrations): models for the crypto and UoW tests.
+INSTALLED_APPS = [*INSTALLED_APPS, "tests.crypto_testapp", "tests.uow_testapp"]
+
+# Pinned, so tests never depend on a developer's .env or environment.
+OUTBOX_SENDER = "console"
+OUTBOX_MAX_ATTEMPTS = 5
+OUTBOX_BASE_DELAY_SECONDS = 60
+OUTBOX_BACKOFF_FACTOR = 2
+OUTBOX_MAX_DELAY_SECONDS = 3600
+OUTBOX_BATCH_SIZE = 100
+
 DATABASES = {
     "default": {
         **env.db("DATABASE_URL", default="postgres://kospm:kospm@localhost:5432/kospm"),

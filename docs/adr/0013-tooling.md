@@ -30,6 +30,8 @@ Development happens on Windows 11 without Docker, and CI runs on Linux.
 
   Forbidden lists are deny-lists, so a unit test (Phase 1) additionally asserts that every
   external import of a `domain` or `service_layer` module is from the standard library.
+  Phase 1 extended contracts 2 and 4 to the shared kernel and made that test transitive: see
+  ADR 0014, "Architecture checks for the shared kernel".
 - **GNU make** (`ezwinports.make` on Windows): `make check` = lint + typecheck + lint-imports +
   migrations-check + test-all. Recipes are only `cd backend && uv run …`, so they work under
   cmd.exe and sh, and they set `PYTHONUTF8=1`. **GitHub Actions** runs `make check` on `postgres:16`.

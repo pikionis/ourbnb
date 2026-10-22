@@ -40,8 +40,8 @@ messages, referring to the book's patterns by name (Repository, Unit of Work, Ag
 - Repositories return **domain objects**, not Django models. Mapping lives in `adapters/repository.py`
   (`to_domain()` / `from_domain()`).
 - One **Unit of Work** per command handler (`with uow: ... uow.commit()`), wrapping `transaction.atomic`.
-- Aggregates collect domain events in `self.events`; the UoW publishes them after commit to the
-  in-process **message bus** (`kospm.shared.messagebus`).
+- Aggregates collect domain events in `self.events`; the in-process **message bus**
+  (`kospm.shared.messagebus`) collects them from the UoW after commit.
 - Side effects to the outside world (WhatsApp, email) go through the **outbox** table and are sent by
   a worker — never inside a domain object, never inside the DB transaction.
 - Time comes from an injected `Clock` port. Never call `datetime.now()` in domain or service code.

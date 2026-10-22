@@ -28,7 +28,7 @@ kospm/
       shared/
         domain/                 # Money, Entity/Aggregate base, DomainEvent, Command, ids
         messagebus.py           # in-process bus (Cosmic Python ch. 8–10)
-        unit_of_work.py         # abstract UoW + DjangoUnitOfWork
+        unit_of_work.py         # abstract UoW (DjangoUnitOfWork lives in shared/adapters/)
         clock.py                # Clock port, SystemClock, FixedClock (tests)
         outbox/                 # outbox model + worker
         adapters/crypto.py      # Fernet encryption helpers
@@ -90,17 +90,17 @@ kospm/
 **Done when:** `make check` is green on an empty test, CI passes, admin login works locally.
 
 ## Phase 1 — Shared kernel
-- [ ] `Money` value object (Decimal, EUR, add/sub/multiply by Decimal, `percent()`, rounding half-up,
+- [x] `Money` value object (Decimal, EUR, add/sub/multiply by Decimal, `percent()`, rounding half-up,
       no float accepted — raises `TypeError`).
-- [ ] `DomainEvent`, `Command` base dataclasses; `Aggregate` base with `events: list[DomainEvent]`.
-- [ ] `Clock` port with `SystemClock` and `FixedClock`; helpers for Athens local date/time.
-- [ ] `AbstractUnitOfWork`, `DjangoUnitOfWork` (transaction.atomic, collects events from seen aggregates).
-- [ ] `MessageBus` handling commands (one handler) and events (many handlers), with retries for events.
-- [ ] `bootstrap.py` wiring with dependency injection (Cosmic Python ch. 13); tests bootstrap with fakes.
-- [ ] Outbox: `OutboxMessage` model (id, channel, recipient, template, payload, status, attempts,
+- [x] `DomainEvent`, `Command` base dataclasses; `Aggregate` base with `events: list[DomainEvent]`.
+- [x] `Clock` port with `SystemClock` and `FixedClock`; helpers for Athens local date/time.
+- [x] `AbstractUnitOfWork`, `DjangoUnitOfWork` (transaction.atomic, collects events from seen aggregates).
+- [x] `MessageBus` handling commands (one handler) and events (many handlers), with retries for events.
+- [x] `bootstrap.py` wiring with dependency injection (Cosmic Python ch. 13); tests bootstrap with fakes.
+- [x] Outbox: `OutboxMessage` model (id, channel, recipient, template, payload, status, attempts,
       created_at, sent_at), `enqueue()` inside UoW, `process_outbox` management command with
       exponential backoff. Sender is a port (`ConsoleSender` in dev, WhatsApp in phase 6).
-- [ ] Fernet crypto helper + `EncryptedTextField` for Django models.
+- [x] Fernet crypto helper + `EncryptedTextField` for Django models.
 
 **Tests:** Money arithmetic and rounding; bus routes events to all handlers; UoW rolls back on
 exception; outbox retries and marks failures after N attempts.

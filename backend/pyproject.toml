@@ -30,6 +30,9 @@ dev = [
     "ruff>=0.17",
     # Enforces the architecture's dependency rules (CLAUDE.md) as import contracts.
     "import-linter>=2.15",
+    # Import graph for the transitive purity check in tests/unit/test_architecture.py
+    # (import-linter's own engine, used directly by that test).
+    "grimp>=3.17,<4",
 ]
 
 [build-system]
@@ -65,6 +68,11 @@ select = [
     "DJ",   # flake8-django
     "TID",  # flake8-tidy-imports: absolute imports only + banned APIs below
     "RUF",  # ruff-specific rules
+]
+ignore = [
+    # Domain exceptions are named in the ubiquitous language (DOMAIN.md §3, BUILD_PLAN), e.g.
+    # PropertyNotReadyForActivation, OverlappingReservation, not "...Error".
+    "N818",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -165,7 +173,8 @@ unmatched_ignore_imports_alerting = "none"
 [[tool.importlinter.contracts]]
 name = "Hexagonal layers inside every bounded context"
 type = "layers"
-containers = ["kospm.*"]
+# The outbox is a shared-kernel Django app laid out like a context (domain.py, service_layer/, ...).
+containers = ["kospm.*", "kospm.shared.outbox"]
 layers = ["(entrypoints)", "(adapters)", "(models)", "(service_layer)", "(domain)"]
 
 [[tool.importlinter.contracts]]
@@ -194,7 +203,13 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "Service layer never touches Django, the ORM or adapters"
 type = "forbidden"
-source_modules = ["kospm.**.service_layer"]
+# The shared bus, Unit of Work and Clock are service-layer machinery: pure Python as well.
+source_modules = [
+    "kospm.**.service_layer",
+    "kospm.shared.messagebus",
+    "kospm.shared.unit_of_work",
+    "kospm.shared.clock",
+]
 forbidden_modules = [
     "django",
     "environ",

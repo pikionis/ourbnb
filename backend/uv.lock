@@ -221,6 +221,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "django-stubs", extra = ["compatible-mypy"] },
+    { name = "grimp" },
     { name = "import-linter" },
     { name = "pytest" },
     { name = "pytest-django" },
@@ -240,6 +241,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "django-stubs", extras = ["compatible-mypy"], specifier = ">=5.2.9,<5.3" },
+    { name = "grimp", specifier = ">=3.17,<4" },
     { name = "import-linter", specifier = ">=2.15" },
     { name = "pytest", specifier = ">=9" },
     { name = "pytest-django", specifier = ">=4.14" },
