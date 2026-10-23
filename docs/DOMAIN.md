@@ -148,6 +148,9 @@ Fields: `id`, `property_id`, `channel`, `external_uid` (iCal UID), `confirmation
   late check-out.
 - Minimum stay is configured on the platforms, not enforced here. Off-season: 4 nights. High season:
   minimum stay at first, later 2-night stays at higher price. Code must not assume a minimum stay.
+- Advance notice (how late before check-in a booking may be made) is configured on the platforms,
+  not enforced here: normally 48 h, at least 24 h. Late bookings are therefore rare, but code must
+  not assume it: a later booking is still imported, planned and announced as a schedule change.
 
 ### iCal sync
 - Each property has one iCal URL per channel. Poll every 30 minutes (configurable).
@@ -160,6 +163,15 @@ Fields: `id`, `property_id`, `channel`, `external_uid` (iCal UID), `confirmation
   - dates changed → `ReservationRescheduled(old_dates, new_dates)`
   - disappeared from feed (and start date in the future) → `ReservationCancelled`
 - The sync is idempotent: running it twice with the same feed produces no events.
+- **Feed health.** A sync of one feed fails when the fetch errors (network, HTTP status, unparseable
+  content) or when it returns no events while that feed still has future confirmed reservations.
+  A failed sync changes nothing: no reservation is cancelled, rescheduled or added from that feed.
+- When a feed has kept failing for longer than the alert threshold (configuration, default 2 h =
+  4 consecutive syncs), `CalendarFeedFailing(property_id, channel, since)` is raised and the admin
+  receives one WhatsApp alert for that incident. The next successful sync ends the incident; a new
+  incident alerts again.
+- An empty feed is accepted only when the admin confirms it (e.g. listing closed, all bookings
+  cancelled); its future reservations are then cancelled as usual.
 
 `StayEnded` is raised by a scheduled job on the check-out date.
 
@@ -272,9 +284,20 @@ standby). If mandatory ≥ capacity − 1 → alert admin with date and properti
 properties could be set to "closed to arrival" on the platforms (manual action by admin).
 
 ### Publishing
-- Plan for day D is computed and sent to each person at 18:00 on D−1 via WhatsApp template, with one
-  signed link per task.
+- A **provisional plan** covers the next 14 days (horizon: configuration). Days are planned in order,
+  so flexible tasks (P4–P5) left unassigned on one day roll to the next. It is recomputed whenever
+  tasks change (import, reschedule, cancellation, admin edit) and keeps every existing assignment
+  that is still valid, so one new booking does not reshuffle the whole fortnight.
+- The provisional plan is shown in the admin and on each person's schedule page; it is **not** sent
+  on WhatsApp.
+- The **final plan** for day D is the provisional plan for D as it stands at 18:00 on D−1. It is fixed
+  then and sent to each person via WhatsApp template, with one signed link per task.
 - Any later change affecting D re-plans and sends a "schedule changed" message only to affected people.
+
+### Person schedule page (signed link, no login)
+Each team member has one signed link showing their provisional days for the next 14 days (property,
+time slot, priority). It never shows lockbox codes; those appear only on the task page on the
+planned date.
 
 ### Cleaner task page (signed link, no login)
 Shows: property name, Google Maps link, time slot and reason, lockbox code (visible only on the

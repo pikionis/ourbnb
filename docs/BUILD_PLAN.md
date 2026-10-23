@@ -130,7 +130,7 @@ Domain:
 - [ ] `Reservation` aggregate (see DOMAIN §6), `Channel` enum, overlap check as domain service
       `ReservationCalendar(property_id).accept(reservation)` raising `OverlappingReservation`.
 - [ ] Events `ReservationImported`, `ReservationRescheduled`, `ReservationCancelled`, `StayEnded`,
-      `CalendarEventNeedsReview`.
+      `CalendarEventNeedsReview`, `CalendarFeedFailing`.
 - [ ] `CalendarDiff` domain service: given stored reservations and imported events → list of events
       (new / rescheduled / cancelled). Pure function, heavily unit-tested.
 
@@ -139,6 +139,9 @@ Adapters:
 - [ ] `ICalParser` (library `icalendar`) → `ImportedCalendarEvent`; per-channel classifiers
       (`AirbnbClassifier`, `BookingClassifier`) deciding reservation vs block vs unknown.
 - [ ] Management command `sync_calendars` (all active properties); scheduled every 30 min.
+- [ ] Feed health (DOMAIN §6): a failed or empty-with-future-reservations sync changes nothing;
+      `CalendarFeedFailing` after the alert threshold (configuration, default 2 h) → one admin
+      WhatsApp alert per incident; admin action "Confirm empty calendar".
 - [ ] Management command `emit_stay_ended` daily at 12:00 Athens.
 - [ ] Admin: reservations list with filters (property, channel, dates, status), manual create/edit
       (channel DIRECT), "review queue" for unclassified calendar events, edit check-in/out times.
@@ -146,7 +149,10 @@ Adapters:
 **Tests (fixtures in `tests/fixtures/ical/`):** first import creates reservations; second identical
 import emits nothing (idempotent); changed dates → rescheduled; removed future event → cancelled;
 removed past event → no cancellation; overlap → alert, not saved; block events ignored; unknown →
-review queue; check-out day may equal next check-in day.
+review queue; check-out day may equal next check-in day; fetch error → nothing changes; empty feed
+while future reservations exist → nothing cancelled; failing ≥ threshold → exactly one alert, none
+repeated while still failing, a new one after recovery and a new failure; admin-confirmed empty feed
+→ future reservations cancelled.
 
 ## Phase 4 — Housekeeping domain (core algorithm, pure TDD)
 Everything here is pure Python, no Django. This is the heart of v1.
@@ -159,6 +165,9 @@ Everything here is pure Python, no Django. This is the heart of v1.
       `deadline`; recompute on import/reschedule/cancel (pure function, returns add/update/remove).
 - [ ] `plan_day(day, tasks, team, policy, preferences, allow_emergency=False) -> DailySchedule`.
 - [ ] `DailySchedule` aggregate with invariants (limits, no duplicates, unassigned mandatory → alert).
+- [ ] `plan_horizon(start, days, tasks, team, policy, preferences, previous) -> list[DailySchedule]`:
+      the provisional plan (DOMAIN §9 Publishing) — plans days in order, rolls flexible tasks forward,
+      keeps the still-valid assignments of `previous`; horizon (14 days) is configuration.
 - [ ] `forecast_overload(days, tasks, team, policy) -> list[OverloadWarning]`.
 - [ ] `LinenStock` aggregate + `RestockPlanner.urgency(stock, upcoming_checkouts, horizon=3)`.
 - [ ] `Issue` aggregate: `REPORTED → APPROVED | REJECTED → RESOLVED`; `approve(cost, owner_visible)`.
@@ -181,14 +190,19 @@ Everything here is pure Python, no Django. This is the heart of v1.
 14. Deterministic output: same input → same schedule (stable sorting by deadline, then property code).
 
 **Other tests:** deriver handles back-to-back stays, gaps, cancellations, reschedules; overload
-forecast warns at capacity − 1; restock urgency urgent/normal/none cases.
+forecast warns at capacity − 1; restock urgency urgent/normal/none cases; `plan_horizon` rolls an
+unassigned flexible task to the next day, a new booking changes only the assignments it must, and
+the same input gives the same provisional plan.
 
 ## Phase 5 — Housekeeping application layer
 - [ ] ORM models + repositories for tasks, schedules, team, linen stock, issues, restocks.
 - [ ] Event handlers: `ReservationImported/Rescheduled/Cancelled` → re-derive tasks for that property
-      → if affected day is already published → re-plan and enqueue "schedule changed" to affected people.
-- [ ] Command `plan_tomorrow` at 18:00 Athens: plan D+1, persist, enqueue one WhatsApp per person with
-      their list and one signed link per task.
+      → refresh the provisional plan → if affected day is already published → re-plan and enqueue
+      "schedule changed" to affected people.
+- [ ] Command `plan_tomorrow` at 18:00 Athens: fix D+1 from the provisional plan, persist, enqueue one
+      WhatsApp per person with their list and one signed link per task.
+- [ ] Person schedule page `/s/<signed-token>/`: provisional days for the next 14 days, no lockbox
+      codes, Greek/English, mobile-first, no login.
 - [ ] Command `forecast_overload` daily 08:00 → admin alert (WhatsApp/email to admin) for next 30 days,
       with suggested properties to set "closed to arrival".
 - [ ] Cleaner task page `/c/<signed-token>/` (Django `TimestampSigner`, valid until end of planned
@@ -210,7 +224,8 @@ shows everything.
 ## Phase 6 — WhatsApp messaging adapter
 - [ ] `MessageSender` port; `WhatsAppCloudSender` (Graph API, token from env), `ConsoleSender` (dev).
 - [ ] `templates.py`: template names, languages (el, en), parameter order — cleaner daily schedule,
-      schedule changed, admin overload alert, admin issue reported. Script `whatsapp_sync_templates`
+      schedule changed, admin overload alert, admin issue reported, admin calendar feed failing.
+      Script `whatsapp_sync_templates`
       to create/update templates via API (run manually by Petros with his token).
 - [ ] Inbound webhook `/webhooks/whatsapp/`: verify token handshake, validate `X-Hub-Signature-256`,
       store raw message, emit `InboundMessageReceived` (used by guests context in v2).
