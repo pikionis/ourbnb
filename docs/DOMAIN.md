@@ -36,6 +36,7 @@ tax declarations and the owner portal.
 | Greek (business) | Code name | Meaning |
 |---|---|---|
 | Ιδιοκτήτης | `Owner` | Person who owns one or more properties and signs a contract with the IKE |
+| Τραπεζικός λογαριασμός | `BankAccount` | The owner's IBAN for payouts, verified with a test transfer |
 | Ακίνητο / διαμέρισμα | `Property` | A rentable unit managed by the IKE |
 | ΑΜΑ | `ama_number` | Short-term rental registry number issued by AADE, in the IKE's name |
 | Δήλωση υπεκμίσθωσης | `sublease_declaration_number` | AADE declaration by the owner granting sublease rights to the IKE |
@@ -89,6 +90,7 @@ guests       ──GuestLinkedToReservation / IdVerified──────▶ co
 guests       ──EarlyCheckInAgreed / LateCheckOutAgreed────▶ reservations (update times) ──▶ housekeeping (replan)
 reservations ──StayEnded──────────────────────────────────▶ compliance (DeclarationDue), finance (statement ready)
 properties   ──PropertyActivated──────────────────────────▶ reservations (start iCal sync), owner_portal (ask website consent)
+properties   ──PropertyDeactivated/Reactivated/Offboarded─▶ reservations (stop/resume iCal sync), housekeeping (no new cleanings)
 ```
 
 Contexts never import each other's domain models. They communicate through events on the message bus
@@ -99,38 +101,82 @@ and through IDs (`property_id`, `reservation_id`). A context may keep its own sm
 
 ## 5. Properties context
 
+Owners register themselves (owner portal, BUILD_PLAN Phase 2b) or the admin registers them, and
+complete a checklist; a property starts working only when its checklist is complete. Only owners
+register: the IKE is the only manager on the platform. One owner can have many properties.
+Co-ownership is out of scope.
+
+### Aggregate: `Owner`
+Fields: `id`, `name`, `email` (unique), `phone`, `afm` (ΑΦΜ, unique, 9 digits with a valid check
+digit), `bank_account`, `show_on_website` (default `False`), `website_consent_requested`.
+
+### Bank account (on the `Owner`)
+`BankAccount(iban, status)`, where the IBAN must pass the ISO 13616 check (mod 97). States:
+`UNVERIFIED` → `PENDING` → `VERIFIED`.
+- Verification proves the account exists, accepts transfers and belongs to the owner: a test
+  transfer of €0.01 is sent with a 6-digit code in its reference (`PENDING`); the owner enters the
+  code and the account becomes `VERIFIED` (`BankAccountVerified`).
+- Wrong codes are limited (configuration, default 3); after the last one the account returns to
+  `UNVERIFIED` and a new transfer is needed.
+- Changing the IBAN returns the account to `UNVERIFIED`.
+- Who sends the test transfer is an adapter (`BankAccountVerifier` port): at first the admin, from
+  the IKE's e-banking, with the code the platform shows; later automatically through a bank or
+  payment provider (provider and ADR chosen in Phase 2b).
+
 ### Aggregate: `Property`
-Fields: `id`, `owner_id`, `code` (short, e.g. `KOS-A1`), `name`, `address`, `lat`, `lng`,
+Fields: `id`, `owner_id`, `code` (short, e.g. `KOS-A1`, unique), `name`, `address`, `lat`, `lng`,
 `default_check_in_time` (15:00), `default_check_out_time` (11:00), `status`, `ama_number`,
-`sublease_declaration_number`, `contract_id`, `check_in_guide`, `amenities`, `preferred_cleaner_id`,
-`ical_feeds` (list of `channel` + `url`), `linen_par_level` (default 3).
+`sublease_declaration_number`, `contract`, `check_in_guide`, `amenities`, `preferred_cleaner_id`,
+`ical_feeds` (one `url` per `channel`), `linen_par_level` (default 3).
 
-**States:** `DRAFT` → `PENDING_LEGAL` → `ACTIVE` → (`SUSPENDED` | `OFFBOARDED`)
+**States:** `ONBOARDING` → `ACTIVE` ⇄ `INACTIVE`; any state → `OFFBOARDED` (final).
+Admin labels: Σε εξέλιξη · Ενεργό · Ανενεργό · Αποχώρησε. The admin list of properties filters by
+state and shows, for every property in `ONBOARDING`, what is still missing, so the admin knows whom
+to follow up.
 
-**Invariant:** `ACTIVE` only if contract is signed **and** `sublease_declaration_number` is set
-**and** `ama_number` is set. Attempting activation otherwise raises `PropertyNotReadyForActivation`
-listing the missing items.
+**Activation checklist (invariant).** A property becomes `ACTIVE` — first activation, or return
+from `INACTIVE` — only when all of these hold; items can be completed in any order:
+1. the contract is signed (the signed PDF is uploaded);
+2. `sublease_declaration_number` is set;
+3. `ama_number` is set;
+4. the profile is complete: address and coordinates, check-in guide in Greek and English with the
+   exterior and lockbox photos, the guests' lockbox code, at least one included amenity;
+5. the owner's bank account is `VERIFIED` (once per owner, valid for all their properties).
+
+Otherwise activation raises `PropertyNotReadyForActivation` listing every missing item. iCal feeds
+are not on the checklist: under the sublease model the listings run on the IKE's accounts, so the
+admin adds the feeds when the IKE's listing exists.
 
 **Onboarding steps and events**
 
 | # | Who | Action | Event |
 |---|---|---|---|
-| 1 | Owner | Registers (name, email, phone, ΑΦΜ, IBAN) | `OwnerRegistered` |
-| 2 | Admin | Completes property profile (guide, amenities, photos). Listing text may be pasted and parsed by AI into fields (phase 2) | `PropertyProfileCompleted` |
-| 3 | Owner | Signs contract electronically | `ContractSigned` |
-| 4 | Owner or owner's accountant | Files sublease declaration at AADE; admin records the number. System sends reminders while missing | `SubleaseDeclared` |
-| 5 | Admin | Registers property in AADE registry with IKE credentials; records ΑΜΑ | `AmaAssigned` |
-| 6 | System | Checks invariant, activates | `PropertyActivated` |
+| 1 | Owner (or admin) | Registers: name, email, phone, ΑΦΜ, IBAN | `OwnerRegistered` |
+| 2 | Owner (or admin) | Adds a property and completes its profile (guide, amenities, photos). Listing text may be pasted and parsed by AI into fields; the platform never fetches a listing from a platform URL (§2.1) | `PropertyProfileCompleted` |
+| 3 | Owner | Signs the contract (e.g. digitally on gov.gr, by the owner themself; provider to be confirmed with the lawyer) and uploads the signed PDF | `ContractSigned` |
+| 4 | Owner or owner's accountant | Files the sublease declaration at AADE; the number is recorded. Reminders while missing | `SubleaseDeclared` |
+| 5 | Admin | Registers the property in the AADE registry with the IKE's credentials; records the ΑΜΑ | `AmaAssigned` |
+| 6 | Owner + admin | Verifies the bank account (test transfer + code) | `BankAccountVerified` |
+| 7 | Admin | Checks the checklist, activates | `PropertyActivated` |
 
-After `PropertyActivated`, the owner is asked (in their profile) whether their name/logo may appear on
-the public website. `Owner.show_on_website` defaults to `False`.
+After the property's first `PropertyActivated`, the owner is asked (in their profile) whether
+their name/logo may appear on the public website. `Owner.show_on_website` defaults to `False`.
+
+Later states: `ACTIVE` → `INACTIVE` (`PropertyDeactivated`, e.g. paused by the admin),
+`INACTIVE` → `ACTIVE` (`PropertyReactivated`, the checklist is checked again), any state →
+`OFFBOARDED` (`PropertyOffboarded`, final). While a property is not `ACTIVE` it gets no iCal sync
+and no new cleanings.
 
 ### Value objects
-- `CheckInGuide(directions_el, directions_en, map_url, exterior_photo, lockbox_photo, lockbox_code_encrypted)`
-- `Contract(commission_rate=Decimal("0.15"), owner_cleaning_charge=Decimal("40.00"), signed_at, document_url)`
+- `CheckInGuide(directions_el, directions_en, map_url, exterior_photo, lockbox_photo,
+  guest_lockbox_code, cleaner_lockbox_code)`. Lockbox codes are encrypted at rest (§2.3); the
+  cleaners' code defaults to the guests' code when empty.
+- `Contract(commission_rate=Decimal("0.15"), owner_cleaning_charge=Money("40.00"), signed_at,
+  document)` — defaults are configuration. One contract per property until the lawyer says
+  otherwise (§14).
 - `Amenities` — structured list of included / not included items, used by the AI to answer guests.
-
-One owner can have many properties. Co-ownership is out of scope.
+- `IcalFeed(channel, url)` — one per channel (Airbnb, Booking.com), https only.
+- Concurrent changes to one aggregate are detected with a version number (ADR 0016).
 
 ---
 
@@ -403,5 +449,9 @@ properties, owners with `show_on_website = True` (name/logo), testimonials, mana
 - Accountant: exact guest fields required in the AADE declaration; retention period.
 - Accountant: climate resilience fee rates per season / property type.
 - Consumables cost per cleaning (for margin reporting).
-- E-signature provider.
+- E-signature provider (gov.gr digital signature by the owner?) — with the lawyer.
+- ΑΜΑ under the sublease model: always a new ΑΜΑ in the IKE's name, or can an owner's existing ΑΜΑ
+  be used? — accountant/lawyer.
+- One contract per owner or one per property? — lawyer.
+- Provider for automatic bank-account verification transfers (or open banking) — Phase 2b.
 - Whether the WhatsApp `wa.me` link survives Airbnb's message filter (test on a real booking).
