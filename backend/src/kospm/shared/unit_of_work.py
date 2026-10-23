@@ -30,6 +30,14 @@ from kospm.shared.domain import Aggregate, DomainEvent
 from kospm.shared.outbox.service_layer.ports import AbstractOutbox
 
 
+class ConcurrencyError(Exception):
+    """Another unit changed the aggregate since this unit loaded it (ADR 0016).
+
+    Raised on commit; the unit rolls back. Command callers ask the person to reload and retry;
+    the message bus retries event handlers, and each retry loads the newer version.
+    """
+
+
 class TrackingRepository[A: Aggregate[Any]](abc.ABC):
     """Repository base that remembers every aggregate it hands out or receives.
 

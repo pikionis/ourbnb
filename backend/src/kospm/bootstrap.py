@@ -26,13 +26,18 @@ import inspect
 import threading
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import time, timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
+from kospm.properties.adapters.bank_verification import ManualBankAccountVerifier
+from kospm.properties.adapters.unit_of_work import DjangoPropertiesUnitOfWork
+from kospm.properties.domain.defaults import BankVerificationPolicy, PropertyDefaults
+from kospm.properties.service_layer import handlers as properties_handlers
 from kospm.shared.clock import Clock, SystemClock
-from kospm.shared.domain import Command, DomainEvent
+from kospm.shared.domain import Command, DomainEvent, Money
 from kospm.shared.messagebus import (
     DEFAULT_EVENT_RETRY_POLICY,
     EventRetryPolicy,
@@ -175,11 +180,53 @@ def bootstrap(
 
 
 def default_contexts(clock: Clock) -> list[ContextWiring]:
-    """The production wiring of every bounded context. `clock` is for their adapters.
+    """The production wiring of every bounded context. `clock` is for their adapters."""
+    return [
+        ContextWiring(
+            name="properties",
+            uow=DjangoPropertiesUnitOfWork(outbox=DjangoOutbox(clock)),
+            command_handlers=properties_handlers.COMMAND_HANDLERS,
+            event_handlers=properties_handlers.EVENT_HANDLERS,
+            dependencies=properties_dependencies(),
+        )
+    ]
 
-    Phase 1 has no bounded context yet. Phase 2 adds properties.
-    """
-    return []
+
+# --- Properties (DOMAIN §5) ---------------------------------------------------------------------
+
+
+def properties_dependencies() -> dict[str, object]:
+    """The configuration objects and adapters of the properties handlers, from the settings."""
+    return {
+        "property_defaults": property_defaults(),
+        "bank_verification": _bank_verification_policy(),
+        # The admin sends the test transfer by hand until a provider is chosen (Phase 2b).
+        "bank_account_verifier": ManualBankAccountVerifier(),
+    }
+
+
+def property_defaults() -> PropertyDefaults:
+    """The configured defaults of new properties and contracts (forms show and preview them)."""
+    try:
+        return PropertyDefaults(
+            check_in_time=time.fromisoformat(settings.PROPERTY_DEFAULT_CHECK_IN_TIME),
+            check_out_time=time.fromisoformat(settings.PROPERTY_DEFAULT_CHECK_OUT_TIME),
+            linen_par_level=int(settings.PROPERTY_DEFAULT_LINEN_PAR_LEVEL),
+            commission_rate=Decimal(settings.CONTRACT_DEFAULT_COMMISSION_RATE),
+            owner_cleaning_charge=Money(settings.CONTRACT_DEFAULT_OWNER_CLEANING_CHARGE),
+        )
+    except (ArithmeticError, TypeError, ValueError) as error:
+        raise ImproperlyConfigured(
+            "invalid property defaults (PROPERTY_DEFAULT_*, CONTRACT_DEFAULT_*): "
+            f"{type(error).__name__}: {error}"
+        ) from error
+
+
+def _bank_verification_policy() -> BankVerificationPolicy:
+    try:
+        return BankVerificationPolicy(max_attempts=int(settings.BANK_VERIFICATION_MAX_ATTEMPTS))
+    except ValueError as error:
+        raise ImproperlyConfigured(f"invalid BANK_VERIFICATION_MAX_ATTEMPTS: {error}") from error
 
 
 # One bus per thread: a Unit of Work holds the state of the unit in progress (seen aggregates,

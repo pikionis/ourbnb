@@ -24,6 +24,14 @@ repositories so the domain stays free of persistence concerns:
   `ConcurrencyError` and the unit rolls back, so nothing of it is committed or published.
 - Command callers (admin, API) report "changed by someone else, reload and try again". Event
   handlers are retried by the message bus (ADR 0014), and each retry loads the newer version.
+- Forms close the gap between showing and saving: a change form carries the version it was
+  rendered with, and the first command of the save passes it as `expected_version`. The
+  repository's `get(id, expected_version=v)` raises `ConcurrencyError` if the stored version
+  differs, so a form left open while someone else saved cannot overwrite their change. An
+  aggregate loaded this way is confirmed at commit even if the command changed nothing
+  (`UPDATE … SET version = v WHERE id = … AND version = v`, no bump): a save that raced another
+  is refused, and the row stays held until the save's transaction ends, so the save's later
+  commands need no check of their own.
 - The shared base `kospm.shared.adapters.versioned_repository.VersionedDjangoRepository` gives
   every context this behaviour; `ConcurrencyError` lives in `kospm.shared.unit_of_work`.
 
@@ -34,3 +42,6 @@ repositories so the domain stays free of persistence concerns:
 - Every new aggregate table must include `version` and use the shared base repository.
 - Pessimistic locking (`SELECT … FOR UPDATE`) stays for queue-like work only (the outbox,
   ADR 0005).
+- A unit that only reads another aggregate gets no guarantee about it: if a rule ever needs one
+  ("an active property always has a verified account"), it is a new business rule with its own
+  mechanism, not a lock added in passing.

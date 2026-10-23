@@ -107,34 +107,34 @@ exception; outbox retries and marks failures after N attempts.
 
 ## Phase 2 — Properties context
 Domain (`properties/domain/`), DOMAIN §5:
-- [ ] `Owner` aggregate (name, email, phone, afm, bank_account, show_on_website=False,
+- [x] `Owner` aggregate (name, email, phone, afm, bank_account, show_on_website=False,
       website_consent_requested); value objects `Afm` (check digit), `Email`, `Iban` (mod 97).
-- [ ] `BankAccount` with `UNVERIFIED → PENDING → VERIFIED`: start verification with a code,
+- [x] `BankAccount` with `UNVERIFIED → PENDING → VERIFIED`: start verification with a code,
       confirm with the code, limited wrong attempts (configuration), IBAN change resets it.
-- [ ] `Contract` value object (commission_rate 0.15, owner_cleaning_charge 40.00 as `Money`,
+- [x] `Contract` value object (commission_rate 0.15, owner_cleaning_charge 40.00 as `Money`,
       signed_at, document) with defaults from configuration (`PropertyDefaults`).
-- [ ] `Property` aggregate with states `ONBOARDING → ACTIVE ⇄ INACTIVE`, any → `OFFBOARDED`;
+- [x] `Property` aggregate with states `ONBOARDING → ACTIVE ⇄ INACTIVE`, any → `OFFBOARDED`;
       `CheckInGuide` (two lockbox codes), `Amenities`, `IcalFeed`s, `preferred_cleaner_id`,
       `linen_par_level=3`, lat/lng.
-- [ ] Methods: `update_profile()`, `sign_contract()`, `record_sublease_declaration()`,
+- [x] Methods: `update_profile()`, `sign_contract()`, `record_sublease_declaration()`,
       `assign_ama()`, `activate(owner_bank_account_verified)` (checklist; raises
       `PropertyNotReadyForActivation(missing=[...])`), `deactivate()`, `offboard()`,
       `missing_for_activation()` and `profile_gaps()` for the admin.
-- [ ] Events: `OwnerRegistered`, `BankAccountVerified`, `PropertyProfileCompleted`,
+- [x] Events: `OwnerRegistered`, `BankAccountVerified`, `PropertyProfileCompleted`,
       `ContractSigned`, `SubleaseDeclared`, `AmaAssigned`, `PropertyActivated`,
       `PropertyDeactivated`, `PropertyReactivated`, `PropertyOffboarded`.
 
 Service layer & adapters:
-- [ ] Commands + handlers for each step; `PropertiesUnitOfWork`; `DjangoOwnerRepository`,
+- [x] Commands + handlers for each step; `PropertiesUnitOfWork`; `DjangoOwnerRepository`,
       `DjangoPropertyRepository`.
-- [ ] Optimistic concurrency (ADR 0016): version column, conflict → `ConcurrencyError`, unchanged
+- [x] Optimistic concurrency (ADR 0016): version column, conflict → `ConcurrencyError`, unchanged
       aggregates are not written.
-- [ ] Django admin: Owners (read-only inline properties, bank verification code and confirmation),
+- [x] Django admin: Owners (read-only inline properties, bank verification code and confirmation),
       Properties (filter Σε εξέλιξη / Ενεργά / Ανενεργά / Αποχώρησαν, "missing" column, fieldsets
       per onboarding step, status badge, actions Activate / Deactivate / Offboard showing missing
       items), lockbox codes stored encrypted and masked. The admin dispatches commands; it never
       writes the tables directly.
-- [ ] Handler on the first `PropertyActivated` → flag the owner to be asked for website consent
+- [x] Handler on the first `PropertyActivated` → flag the owner to be asked for website consent
       (v3 shows it).
 
 **Tests:** activation fails listing each missing item; activation succeeds when all present;
@@ -152,7 +152,9 @@ Owners register and complete the checklist themselves (DOMAIN §5). Starts with 
 - [ ] Paste listing text → AI extracts profile fields (`ListingTextExtractor` port, Claude adapter)
       → owner reviews. Never fetch a platform URL (DOMAIN §2.1).
 - [ ] Bank account: IBAN entry and code confirmation; choose a provider for automatic test
-      transfers (or open banking) with an ADR.
+      transfers (or open banking) with an ADR. The provider adapter of `BankAccountVerifier`
+      only enqueues the transfer in the outbox; the outbox worker calls the provider, never the
+      unit of work (ADR 0005).
 - [ ] Technology of the owner-facing pages decided at the start of the phase (ADR 0008 update).
 
 ## Phase 3 — Reservations context & iCal sync

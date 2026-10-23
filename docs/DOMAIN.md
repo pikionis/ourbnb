@@ -178,6 +178,25 @@ and no new cleanings.
 - `IcalFeed(channel, url)` — one per channel (Airbnb, Booking.com), https only.
 - Concurrent changes to one aggregate are detected with a version number (ADR 0016).
 
+### Validation details (Phase 2 — to be confirmed by Petros)
+Small rules decided while building Phase 2. They are implemented as written here; change them
+with `/domain-change` if the business wants otherwise.
+- Property `code`: 2–16 characters, Latin letters or digits in groups joined by single hyphens
+  (the hyphens count); stored upper-case (`kos-a1` → `KOS-A1`).
+- Coordinates: both or neither; latitude −90…90, longitude −180…180, at most 6 decimals (≈10 cm).
+- Map link and calendar links: `https://` only.
+- Amenities: duplicates are dropped; an item cannot be both included and not included.
+- `linen_par_level`: at least 1 set.
+- Contract: commission rate 0 ≤ r < 1 with at most 4 decimals (`0.1525` = 15.25 %); owner
+  cleaning charge ≥ €0 in whole cents; the signed PDF is required; no signing time means "now".
+- The sublease declaration number and the ΑΜΑ can be corrected but not removed once recorded.
+- Uploads: the contract is a PDF; photos are JPG, PNG, WebP or HEIC (checked by the domain,
+  on the file extension).
+- Profile completeness: a property may have gaps while `ONBOARDING` (the checklist shows them);
+  an `ACTIVE` property must keep a complete profile (`ProfileMustStayComplete`); an `INACTIVE`
+  one may have gaps, and its return to `ACTIVE` checks the whole checklist again.
+- The cleaners' own lockbox code can be removed again, so cleaners go back to the guests' code.
+
 ---
 
 ## 6. Reservations context

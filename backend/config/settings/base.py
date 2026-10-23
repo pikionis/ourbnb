@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "kospm.shared.outbox",
     # Bounded contexts
     "kospm.identity",
+    "kospm.properties",
 ]
 
 MIDDLEWARE = [
@@ -93,6 +94,18 @@ OUTBOX_MAX_DELAY_SECONDS = env.int("OUTBOX_MAX_DELAY_SECONDS", default=3600)
 # Messages handled per worker run (the scheduler runs it every minute, ADR 0004).
 OUTBOX_BATCH_SIZE = env.int("OUTBOX_BATCH_SIZE", default=100)
 
+# --- Properties (DOMAIN §5): defaults and policies, turned into configuration objects by bootstrap
+
+# What a new property starts with.
+PROPERTY_DEFAULT_CHECK_IN_TIME = "15:00"
+PROPERTY_DEFAULT_CHECK_OUT_TIME = "11:00"
+PROPERTY_DEFAULT_LINEN_PAR_LEVEL = 3
+# Contract terms used when a signed contract does not state its own.
+CONTRACT_DEFAULT_COMMISSION_RATE = "0.15"
+CONTRACT_DEFAULT_OWNER_CLEANING_CHARGE = "40.00"
+# Wrong codes allowed per bank-account test transfer before a new transfer is needed.
+BANK_VERIFICATION_MAX_ATTEMPTS = 3
+
 # --- Authentication ----------------------------------------------------------------------------
 
 AUTH_USER_MODEL = "identity.User"
@@ -121,6 +134,11 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Uploaded files (signed contracts, property photos). In production they are not served publicly
+# (contracts hold personal data); serving through an authenticated view is part of Phase 7.
+MEDIA_URL = "media/"
+MEDIA_ROOT = Path(env.str("MEDIA_ROOT", default=str(BASE_DIR / "media")))
 
 # --- Logging -----------------------------------------------------------------------------------
 

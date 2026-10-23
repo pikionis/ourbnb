@@ -400,8 +400,8 @@ def test_bootstrap_defaults_to_the_system_clock_and_the_production_contexts(
         bus.handle(Ping(target_id=new_id()))
 
 
-def test_phase_one_has_no_production_contexts_yet() -> None:
-    assert default_contexts(FixedClock(NOW)) == []
+def test_the_production_contexts_are_the_bounded_contexts_built_so_far() -> None:
+    assert [context.name for context in default_contexts(FixedClock(NOW))] == ["properties"]
 
 
 # --- One bus per thread ------------------------------------------------------------------------

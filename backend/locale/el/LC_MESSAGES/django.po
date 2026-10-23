@@ -1,0 +1,414 @@
+# Greek translations of KosPM. Maintained by hand (no GNU gettext on the dev machine);
+# compile with `make messages`. tests/unit/test_translations.py checks that none is missing.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: el\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "%(code)s: active."
+msgstr "%(code)s: ενεργό."
+
+msgid "%(code)s: inactive."
+msgstr "%(code)s: ανενεργό."
+
+msgid "%(code)s: offboarded."
+msgstr "%(code)s: αποχώρησε."
+
+msgid "%(name)s: send €0.01 to %(iban)s with reference %(code)s, then enter the code the owner reads on their statement."
+msgstr "%(name)s: στείλε 0,01 € στο %(iban)s με αιτιολογία %(code)s και μετά γράψε τον κωδικό που θα δει ο ιδιοκτήτης στην κίνηση του λογαριασμού του."
+
+msgid "A property that has worked must keep a complete profile. Missing: %(items)s."
+msgstr "Ένα ακίνητο που έχει λειτουργήσει πρέπει να έχει πλήρες προφίλ. Λείπουν: %(items)s."
+
+msgid "Activate (checks the checklist)"
+msgstr "Ενεργοποίηση (με έλεγχο της λίστας)"
+
+msgid "Active"
+msgstr "Ενεργό"
+
+msgid "address"
+msgstr "διεύθυνση"
+
+msgid "Airbnb calendar (iCal link)"
+msgstr "ημερολόγιο Airbnb (σύνδεσμος iCal)"
+
+msgid "AMA number"
+msgstr "ΑΜΑ"
+
+msgid "Amenities"
+msgstr "Παροχές"
+
+msgid "amenities included"
+msgstr "παροχές που περιλαμβάνονται"
+
+msgid "amenities not included"
+msgstr "παροχές που δεν περιλαμβάνονται"
+
+msgid "An amenity cannot be both included and not included."
+msgstr "Μια παροχή δεν μπορεί να είναι ταυτόχρονα στις παρεχόμενες και στις μη παρεχόμενες."
+
+msgid "An owner with this email is already registered."
+msgstr "Υπάρχει ήδη ιδιοκτήτης με αυτό το email."
+
+msgid "An owner with this tax number (AFM) is already registered."
+msgstr "Υπάρχει ήδη ιδιοκτήτης με αυτό το ΑΦΜ."
+
+msgid "at least one amenity"
+msgstr "τουλάχιστον μία παροχή"
+
+msgid "bank account"
+msgstr "τραπεζικός λογαριασμός"
+
+msgid "Bank account"
+msgstr "Τραπεζικός λογαριασμός"
+
+msgid "Booking.com calendar (iCal link)"
+msgstr "ημερολόγιο Booking.com (σύνδεσμος iCal)"
+
+msgid "calendar feeds"
+msgstr "ημερολόγια iCal"
+
+msgid "Calendar links must be https:// addresses, one per platform."
+msgstr "Οι σύνδεσμοι ημερολογίου πρέπει να είναι διευθύνσεις https://, ένας ανά πλατφόρμα."
+
+msgid "Cannot be activated yet. Missing: %(items)s."
+msgstr "Δεν μπορεί να ενεργοποιηθεί ακόμα. Λείπουν: %(items)s."
+
+msgid "channel"
+msgstr "κανάλι"
+
+msgid "Check-in guide"
+msgstr "Οδηγίες check-in"
+
+msgid "check-in time"
+msgstr "ώρα check-in"
+
+msgid "check-out time"
+msgstr "ώρα check-out"
+
+msgid "checklist"
+msgstr "λίστα ενεργοποίησης"
+
+msgid "cleaners use the guests' code again"
+msgstr "οι καθαριστές χρησιμοποιούν ξανά τον κωδικό των επισκεπτών"
+
+msgid "code"
+msgstr "κωδικός"
+
+msgid "code of the test transfer"
+msgstr "κωδικός δοκιμαστικής μεταφοράς"
+
+msgid "commission rate"
+msgstr "ποσοστό προμήθειας"
+
+msgid "complete profile"
+msgstr "πλήρες προφίλ"
+
+msgid "Contract and legal"
+msgstr "Συμβόλαιο και νομικά"
+
+msgid "contract signed at"
+msgstr "ημερομηνία υπογραφής"
+
+msgid "coordinates"
+msgstr "συντεταγμένες"
+
+msgid "created at"
+msgstr "δημιουργήθηκε"
+
+msgid "Deactivate"
+msgstr "Απενεργοποίηση"
+
+msgid "directions (English)"
+msgstr "οδηγίες (αγγλικά)"
+
+msgid "directions (Greek)"
+msgstr "οδηγίες (ελληνικά)"
+
+msgid "email"
+msgstr "email"
+
+msgid "Email"
+msgstr "Email"
+
+msgid "English"
+msgstr "Αγγλικά"
+
+msgid "Enter a name."
+msgstr "Γράψε όνομα."
+
+msgid "Enter a new code or tick “cleaners use the guests' code again”, not both."
+msgstr "Γράψε νέο κωδικό ή τσέκαρε «οι καθαριστές χρησιμοποιούν ξανά τον κωδικό των επισκεπτών», όχι και τα δύο."
+
+msgid "Enter a phone number."
+msgstr "Γράψε αριθμό τηλεφώνου."
+
+msgid "Enter a valid email address."
+msgstr "Γράψε ένα έγκυρο email."
+
+msgid "Enter a valid IBAN."
+msgstr "Γράψε έγκυρο IBAN."
+
+msgid "Enter a valid tax number (AFM): 9 digits with a correct check digit."
+msgstr "Γράψε έγκυρο ΑΦΜ: 9 ψηφία με σωστό ψηφίο ελέγχου."
+
+msgid "Enter both coordinates: latitude from -90 to 90 and longitude from -180 to 180, with at most 6 decimals."
+msgstr "Γράψε και τις δύο συντεταγμένες: γεωγραφικό πλάτος από -90 έως 90 και μήκος από -180 έως 180, με έως 6 δεκαδικά."
+
+msgid "Enter the AMA number. A recorded number can be corrected, not removed."
+msgstr "Γράψε τον ΑΜΑ. Ένας καταχωρημένος αριθμός διορθώνεται, δεν αφαιρείται."
+
+msgid "Enter the date and time the contract was signed."
+msgstr "Γράψε την ημερομηνία και ώρα υπογραφής του συμβολαίου."
+
+msgid "Enter the sublease declaration number. A recorded number can be corrected, not removed."
+msgstr "Γράψε τον αριθμό της δήλωσης υπεκμίσθωσης. Ένας καταχωρημένος αριθμός διορθώνεται, δεν αφαιρείται."
+
+msgid "Everything is in place."
+msgstr "Όλα είναι έτοιμα."
+
+msgid "exterior photo"
+msgstr "φωτογραφία εξωτερικού χώρου"
+
+msgid "Failed"
+msgstr "Απέτυχε"
+
+msgid "failed attempts"
+msgstr "αποτυχημένες προσπάθειες"
+
+msgid "Greek"
+msgstr "Ελληνικά"
+
+msgid "IBAN"
+msgstr "IBAN"
+
+msgid "Identity"
+msgstr "Χρήστες"
+
+msgid "In progress"
+msgstr "Σε εξέλιξη"
+
+msgid "Inactive"
+msgstr "Ανενεργό"
+
+msgid "last error"
+msgstr "τελευταίο σφάλμα"
+
+msgid "latitude"
+msgstr "γεωγραφικό πλάτος"
+
+msgid "Leave empty to keep it. Without one, cleaners use the guests' code."
+msgstr "Άφησέ το κενό για να μείνει ως έχει. Αν δεν υπάρχει, οι καθαρίστριες χρησιμοποιούν τον κωδικό των επισκεπτών."
+
+msgid "Leave empty to keep the stored code."
+msgstr "Άφησέ το κενό για να μείνει ο αποθηκευμένος κωδικός."
+
+msgid "linen sets kept on site"
+msgstr "σετ λινών στο ακίνητο"
+
+msgid "Location"
+msgstr "Τοποθεσία"
+
+msgid "lockbox code for cleaners"
+msgstr "κωδικός κλειδοθήκης καθαριστριών"
+
+msgid "lockbox code for guests"
+msgstr "κωδικός κλειδοθήκης επισκεπτών"
+
+msgid "lockbox photo"
+msgstr "φωτογραφία κλειδοθήκης"
+
+msgid "longitude"
+msgstr "γεωγραφικό μήκος"
+
+msgid "map link"
+msgstr "σύνδεσμος χάρτη"
+
+msgid "missing for activation"
+msgstr "λείπουν για ενεργοποίηση"
+
+msgid "name"
+msgstr "όνομα"
+
+msgid "new lockbox code for cleaners"
+msgstr "νέος κωδικός κλειδοθήκης καθαριστριών"
+
+msgid "new lockbox code for guests"
+msgstr "νέος κωδικός κλειδοθήκης επισκεπτών"
+
+msgid "next attempt at"
+msgstr "επόμενη προσπάθεια"
+
+msgid "Not possible while the property is %(status)s."
+msgstr "Δεν γίνεται όσο το ακίνητο είναι «%(status)s»."
+
+msgid "Offboard (final)"
+msgstr "Αποχώρηση (οριστική)"
+
+msgid "Offboarded"
+msgstr "Αποχώρησε"
+
+msgid "One per line."
+msgstr "Μία σε κάθε γραμμή."
+
+msgid "Operations"
+msgstr "Λειτουργία"
+
+msgid "Outbox"
+msgstr "Εξερχόμενα"
+
+msgid "outbox message"
+msgstr "εξερχόμενο μήνυμα"
+
+msgid "outbox messages"
+msgstr "εξερχόμενα μηνύματα"
+
+msgid "owner"
+msgstr "ιδιοκτήτης"
+
+msgid "owner cleaning charge (€)"
+msgstr "χρέωση καθαρισμού ιδιοκτήτη (€)"
+
+msgid "owners"
+msgstr "ιδιοκτήτες"
+
+msgid "payload"
+msgstr "περιεχόμενο"
+
+msgid "Pending"
+msgstr "Σε αναμονή"
+
+msgid "phone"
+msgstr "τηλέφωνο"
+
+msgid "preferred cleaner"
+msgstr "προτιμώμενη καθαρίστρια"
+
+msgid "Profile still needs"
+msgstr "Στο προφίλ λείπουν"
+
+msgid "Properties"
+msgstr "Ακίνητα"
+
+msgid "properties"
+msgstr "ακίνητα"
+
+msgid "property"
+msgstr "ακίνητο"
+
+msgid "Public website"
+msgstr "Δημόσιο site"
+
+msgid "recipient"
+msgstr "παραλήπτης"
+
+msgid "registered at"
+msgstr "ημερομηνία εγγραφής"
+
+msgid "Removes the cleaners' own code."
+msgstr "Αφαιρεί τον ξεχωριστό κωδικό των καθαριστών."
+
+msgid "same as the guests' code"
+msgstr "ίδιος με των επισκεπτών"
+
+msgid "Sent"
+msgstr "Στάλθηκε"
+
+msgid "sent at"
+msgstr "στάλθηκε στις"
+
+msgid "shown on the website"
+msgstr "εμφανίζεται στο site"
+
+msgid "signed contract"
+msgstr "υπογεγραμμένο συμβόλαιο"
+
+msgid "Someone else changed this in the meantime. Reload the page and try again."
+msgstr "Κάποιος άλλος το άλλαξε στο μεταξύ. Φόρτωσε ξανά τη σελίδα και δοκίμασε πάλι."
+
+msgid "Start the bank account verification (test transfer)"
+msgstr "Έναρξη επιβεβαίωσης τραπεζικού λογαριασμού (δοκιμαστική μεταφορά)"
+
+msgid "Start the verification first: send the test transfer."
+msgstr "Ξεκίνα πρώτα την επιβεβαίωση: στείλε τη δοκιμαστική μεταφορά."
+
+msgid "status"
+msgstr "κατάσταση"
+
+msgid "sublease declaration number"
+msgstr "αριθμός δήλωσης υπεκμίσθωσης"
+
+msgid "tax number (AFM)"
+msgstr "ΑΦΜ"
+
+msgid "template"
+msgstr "πρότυπο"
+
+msgid "test transfer"
+msgstr "δοκιμαστική μεταφορά"
+
+msgid "Text encrypted at rest"
+msgstr "Κρυπτογραφημένο κείμενο"
+
+msgid "The 6 digits the owner read on their bank statement."
+msgstr "Τα 6 ψηφία που είδε ο ιδιοκτήτης στην κίνηση του λογαριασμού του."
+
+msgid "The bank account is already verified."
+msgstr "Ο τραπεζικός λογαριασμός είναι ήδη επιβεβαιωμένος."
+
+msgid "The bank account is verified."
+msgstr "Ο τραπεζικός λογαριασμός επιβεβαιώθηκε."
+
+msgid "The cleaning charge is an amount in euros and cents, not negative."
+msgstr "Η χρέωση καθαρισμού είναι ποσό σε ευρώ και λεπτά, όχι αρνητικό."
+
+msgid "The code %(code)s is already used by another property."
+msgstr "Ο κωδικός %(code)s χρησιμοποιείται ήδη από άλλο ακίνητο."
+
+msgid "The commission is a rate from 0 to below 1 (0.15 for 15 percent), with at most 4 decimals."
+msgstr "Η προμήθεια είναι ποσοστό από 0 έως κάτω από 1 (0.15 για 15 τοις εκατό), με έως 4 δεκαδικά."
+
+msgid "The linen par level is at least one set."
+msgstr "Το απόθεμα λευκών ειδών είναι τουλάχιστον ένα σετ."
+
+msgid "The map link must be an https:// address."
+msgstr "Ο σύνδεσμος χάρτη πρέπει να είναι διεύθυνση https://."
+
+msgid "The verification code has 6 digits."
+msgstr "Ο κωδικός επιβεβαίωσης έχει 6 ψηφία."
+
+msgid "Unverified"
+msgstr "Ανεπιβεβαίωτος"
+
+msgid "Upload a photo: JPG, PNG, WebP or HEIC."
+msgstr "Ανέβασε φωτογραφία: JPG, PNG, WebP ή HEIC."
+
+msgid "Upload the signed contract as a PDF."
+msgstr "Ανέβασε το υπογεγραμμένο συμβόλαιο σε PDF."
+
+msgid "Use 2 to 16 characters: Latin letters or digits, in groups joined by single hyphens (e.g. KOS-A1)."
+msgstr "Χρησιμοποίησε 2 έως 16 χαρακτήρες: λατινικά γράμματα ή ψηφία, σε ομάδες με μία παύλα ανάμεσα (π.χ. KOS-A1)."
+
+msgid "Verified"
+msgstr "Επιβεβαιωμένος"
+
+msgid "verified bank account"
+msgstr "επιβεβαιωμένος τραπεζικός λογαριασμός"
+
+msgid "Waiting for the code"
+msgstr "Αναμονή κωδικού"
+
+msgid "website consent asked"
+msgstr "ερωτήθηκε για το site"
+
+msgid "WhatsApp"
+msgstr "WhatsApp"
+
+msgid "Wrong code. Send a new test transfer."
+msgstr "Λάθος κωδικός. Στείλε νέα δοκιμαστική μεταφορά."
+
+msgid "Wrong code. %(count)d attempt left."
+msgid_plural "Wrong code. %(count)d attempts left."
+msgstr[0] "Λάθος κωδικός. Απομένει %(count)d προσπάθεια."
+msgstr[1] "Λάθος κωδικός. Απομένουν %(count)d προσπάθειες."

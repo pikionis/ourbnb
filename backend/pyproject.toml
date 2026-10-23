@@ -74,6 +74,12 @@ ignore = [
     # PropertyNotReadyForActivation, OverlappingReservation, not "...Error".
     "N818",
 ]
+# User-facing texts and test data are Greek (CLAUDE.md), so Greek letters that look Latin are
+# expected in strings, docstrings and comments (RUF001-RUF003), not a homoglyph trick.
+allowed-confusables = [
+    "Α", "Β", "Ε", "Ζ", "Η", "Ι", "Κ", "Μ", "Ν", "Ο", "Ρ", "Τ", "Υ", "Χ",
+    "α", "γ", "ι", "κ", "ν", "ο", "ρ", "σ", "τ", "υ", "χ",
+]
 
 [tool.ruff.lint.per-file-ignores]
 # Settings modules layer on top of base.py with `from config.settings.base import *`.

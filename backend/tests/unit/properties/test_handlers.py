@@ -1,0 +1,407 @@
+"""Handlers of the properties context, driven through the real bus with fakes (Cosmic Python ch. 5).
+
+Each test sends commands the way the admin (and later the owner portal) does and checks the
+stored aggregates, the commits and the events that reached other handlers.
+"""
+
+from datetime import UTC, datetime, time
+from decimal import Decimal
+from typing import Any
+from uuid import UUID
+
+import pytest
+
+from kospm.bootstrap import ContextWiring, bootstrap
+from kospm.properties.domain.checklist import ActivationRequirement
+from kospm.properties.domain.commands import (
+    ActivateProperty,
+    AssignAma,
+    ChangeOwnerIban,
+    ConfirmBankAccount,
+    CreateProperty,
+    DeactivateProperty,
+    OffboardProperty,
+    RecordSubleaseDeclaration,
+    RegisterOwner,
+    SignContract,
+    StartBankAccountVerification,
+    UpdateOwnerDetails,
+    UpdatePropertyProfile,
+)
+from kospm.properties.domain.defaults import BankVerificationPolicy, PropertyDefaults
+from kospm.properties.domain.errors import (
+    BankAccountAlreadyVerified,
+    InvalidValue,
+    OwnerAlreadyRegistered,
+    OwnerNotFound,
+    PropertyCodeTaken,
+    PropertyNotFound,
+    PropertyNotReadyForActivation,
+    WrongVerificationCode,
+)
+from kospm.properties.domain.owner import BankAccountStatus
+from kospm.properties.domain.property import PropertyStatus
+from kospm.properties.domain.value_objects import Email, Iban, IcalChannel, PropertyCode
+from kospm.properties.service_layer.handlers import COMMAND_HANDLERS, EVENT_HANDLERS
+from kospm.shared.clock import FixedClock
+from kospm.shared.domain import Money, new_id
+from kospm.shared.messagebus import MessageBus
+from tests.unit.properties.builders import (
+    OTHER_VALID_AFM,
+    OTHER_VALID_IBAN,
+    VALID_AFM,
+    VALID_IBAN,
+)
+from tests.unit.properties.fakes import (
+    FakeBankAccountVerifier,
+    FakePropertiesUnitOfWork,
+    RequestedTransfer,
+)
+
+NOW = datetime(2026, 10, 23, 10, 0, tzinfo=UTC)
+
+
+class Harness:
+    """A bus wired with the properties handlers, a fake Unit of Work and fixed dependencies."""
+
+    def __init__(self) -> None:
+        self.uow = FakePropertiesUnitOfWork()
+        self.verifier = FakeBankAccountVerifier()
+        self.bus: MessageBus = bootstrap(
+            clock=FixedClock(NOW),
+            contexts=[
+                ContextWiring(
+                    name="properties",
+                    uow=self.uow,
+                    command_handlers=COMMAND_HANDLERS,
+                    event_handlers=EVENT_HANDLERS,
+                    dependencies={
+                        "property_defaults": PropertyDefaults(),
+                        "bank_verification": BankVerificationPolicy(max_attempts=3),
+                        "bank_account_verifier": self.verifier,
+                    },
+                )
+            ],
+        )
+
+    def register_owner(self, *, afm: str = VALID_AFM, email: str = "maria@example.com") -> UUID:
+        owner_id = new_id()
+        self.bus.handle(
+            RegisterOwner(
+                owner_id=owner_id,
+                name="Μαρία Παπαδοπούλου",
+                email=email,
+                phone="+30 6900000000",
+                afm=afm,
+                iban=VALID_IBAN,
+            )
+        )
+        return owner_id
+
+    def create_property(self, owner_id: UUID, code: str = "KOS-A1") -> UUID:
+        property_id = new_id()
+        self.bus.handle(
+            CreateProperty(property_id=property_id, owner_id=owner_id, code=code, name="Σπίτι")
+        )
+        return property_id
+
+    def complete_profile(self, property_id: UUID, **overrides: Any) -> None:
+        values: dict[str, Any] = {
+            "property_id": property_id,
+            "name": "Σπίτι Αιγαίου",
+            "address": "Βασιλέως Παύλου 12, Κως",
+            "lat": Decimal("36.893300"),
+            "lng": Decimal("27.288900"),
+            "directions_el": "Δεύτερο στενό δεξιά.",
+            "directions_en": "Second street on the right.",
+            "map_url": "",
+            "exterior_photo": "properties/photos/exterior.jpg",
+            "lockbox_photo": "properties/photos/lockbox.jpg",
+            "guest_lockbox_code": "4711",
+            "cleaner_lockbox_code": "",
+            "amenities_included": ("Wi-Fi",),
+            "amenities_not_included": (),
+            "ical_feeds": (),
+            "default_check_in_time": time(15),
+            "default_check_out_time": time(11),
+            "linen_par_level": 3,
+            "preferred_cleaner_id": None,
+        }
+        values.update(overrides)
+        self.bus.handle(UpdatePropertyProfile(**values))
+
+    def do_legal_steps(self, property_id: UUID) -> None:
+        self.bus.handle(SignContract(property_id=property_id, document="contracts/signed.pdf"))
+        self.bus.handle(RecordSubleaseDeclaration(property_id=property_id, number="ΔΥ-123"))
+        self.bus.handle(AssignAma(property_id=property_id, ama_number="00001234567"))
+
+    def verify_bank_account(self, owner_id: UUID) -> None:
+        self.bus.handle(StartBankAccountVerification(owner_id=owner_id))
+        code = self.owner(owner_id).bank_account.verification_code
+        self.bus.handle(ConfirmBankAccount(owner_id=owner_id, code=code))
+
+    def owner(self, owner_id: UUID) -> Any:
+        return next(o for o in self.uow.owners.all() if o.id == owner_id)
+
+    def property(self, property_id: UUID) -> Any:
+        return next(p for p in self.uow.properties.all() if p.id == property_id)
+
+
+@pytest.fixture
+def harness() -> Harness:
+    return Harness()
+
+
+class TestOwners:
+    def test_registers_an_owner(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        owner = harness.owner(owner_id)
+        assert owner.email == Email("maria@example.com")
+        assert owner.bank_account.status is BankAccountStatus.UNVERIFIED
+        assert harness.uow.committed == 1
+
+    def test_afm_and_email_identify_one_owner(self, harness: Harness) -> None:
+        harness.register_owner()
+        with pytest.raises(OwnerAlreadyRegistered) as same_afm:
+            harness.register_owner(email="other@example.com")
+        with pytest.raises(OwnerAlreadyRegistered) as same_email:
+            harness.register_owner(afm=OTHER_VALID_AFM, email="MARIA@example.com")
+        assert (same_afm.value.field, same_email.value.field) == ("afm", "email")
+        assert len(harness.uow.owners.all()) == 1
+
+    def test_an_invalid_afm_registers_nothing(self, harness: Harness) -> None:
+        with pytest.raises(InvalidValue):
+            harness.register_owner(afm="123456789")
+        assert harness.uow.owners.all() == []
+
+    def test_details_change_but_the_email_stays_unique(self, harness: Harness) -> None:
+        maria = harness.register_owner()
+        harness.register_owner(afm=OTHER_VALID_AFM, email="nikos@example.com")
+        harness.bus.handle(
+            UpdateOwnerDetails(owner_id=maria, name="Μαρία Π.", email="m@example.com", phone="1")
+        )
+        assert harness.owner(maria).name == "Μαρία Π."
+        with pytest.raises(OwnerAlreadyRegistered):
+            harness.bus.handle(
+                UpdateOwnerDetails(
+                    owner_id=maria, name="Μαρία", email="nikos@example.com", phone="1"
+                )
+            )
+
+    def test_a_new_iban_must_be_verified_again(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        harness.verify_bank_account(owner_id)
+        harness.bus.handle(ChangeOwnerIban(owner_id=owner_id, iban=OTHER_VALID_IBAN))
+        account = harness.owner(owner_id).bank_account
+        assert (account.iban, account.status) == (
+            Iban(OTHER_VALID_IBAN),
+            BankAccountStatus.UNVERIFIED,
+        )
+
+    def test_unknown_owner(self, harness: Harness) -> None:
+        with pytest.raises(OwnerNotFound):
+            harness.bus.handle(StartBankAccountVerification(owner_id=new_id()))
+
+
+class TestBankAccountVerification:
+    def test_the_verifier_sends_the_transfer_with_its_code(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        harness.bus.handle(StartBankAccountVerification(owner_id=owner_id))
+        account = harness.owner(owner_id).bank_account
+        assert (account.status, account.verification_code) == (
+            BankAccountStatus.PENDING,
+            "123456",
+        )
+        assert harness.verifier.transfers == [
+            RequestedTransfer(owner_id, Iban(VALID_IBAN), "123456")
+        ]
+
+    def test_no_transfer_for_a_verified_account(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        harness.verify_bank_account(owner_id)
+        with pytest.raises(BankAccountAlreadyVerified):
+            harness.bus.handle(StartBankAccountVerification(owner_id=owner_id))
+        assert len(harness.verifier.transfers) == 1
+
+    def test_the_code_stays_out_of_the_command_repr(self) -> None:
+        assert "987654" not in repr(ConfirmBankAccount(owner_id=new_id(), code="987654"))
+
+    def test_a_wrong_code_is_reported_after_the_attempt_is_saved(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        harness.bus.handle(StartBankAccountVerification(owner_id=owner_id))
+        commits_before = harness.uow.committed
+        with pytest.raises(WrongVerificationCode) as wrong:
+            harness.bus.handle(ConfirmBankAccount(owner_id=owner_id, code="000000"))
+        assert wrong.value.attempts_left == 2
+        assert harness.uow.committed == commits_before + 1
+        assert harness.owner(owner_id).bank_account.failed_attempts == 1
+
+    def test_the_right_code_verifies_the_account(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        harness.verify_bank_account(owner_id)
+        assert harness.owner(owner_id).bank_account_verified is True
+
+
+class TestProperties:
+    def test_one_owner_with_many_properties(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        for code in ("KOS-A1", "KOS-A2", "KOS-B1"):
+            harness.create_property(owner_id, code)
+        owned = harness.uow.properties.list_by_owner(owner_id)
+        assert sorted(str(p.code) for p in owned) == ["KOS-A1", "KOS-A2", "KOS-B1"]
+        assert {p.status for p in owned} == {PropertyStatus.ONBOARDING}
+
+    def test_a_property_belongs_to_a_registered_owner(self, harness: Harness) -> None:
+        with pytest.raises(OwnerNotFound):
+            harness.create_property(new_id())
+
+    def test_the_code_identifies_one_property(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        harness.create_property(owner_id, "KOS-A1")
+        with pytest.raises(PropertyCodeTaken):
+            harness.create_property(owner_id, "kos-a1")
+
+    def test_a_profile_update_keeps_the_lockbox_codes_unless_new_ones_are_given(
+        self, harness: Harness
+    ) -> None:
+        property_id = harness.create_property(harness.register_owner())
+        harness.complete_profile(property_id, guest_lockbox_code="4711")
+        harness.complete_profile(property_id, guest_lockbox_code=None, name="Νέο όνομα")
+        assert harness.property(property_id).check_in_guide.guest_lockbox_code == "4711"
+        harness.complete_profile(property_id, guest_lockbox_code="8080")
+        assert harness.property(property_id).check_in_guide.guest_lockbox_code == "8080"
+
+    def test_the_profile_takes_the_calendar_feeds(self, harness: Harness) -> None:
+        property_id = harness.create_property(harness.register_owner())
+        harness.complete_profile(
+            property_id, ical_feeds=(("airbnb", "https://www.airbnb.com/calendar/ical/1.ics"),)
+        )
+        (feed,) = harness.property(property_id).ical_feeds
+        assert feed.channel is IcalChannel.AIRBNB
+
+    def test_coordinates_come_in_pairs(self, harness: Harness) -> None:
+        property_id = harness.create_property(harness.register_owner())
+        with pytest.raises(InvalidValue):
+            harness.complete_profile(property_id, lng=None)
+
+    def test_a_contract_without_terms_gets_the_configured_defaults(self, harness: Harness) -> None:
+        property_id = harness.create_property(harness.register_owner())
+        harness.bus.handle(SignContract(property_id=property_id, document="contracts/a.pdf"))
+        contract = harness.property(property_id).contract
+        assert (contract.commission_rate, contract.owner_cleaning_charge, contract.signed_at) == (
+            Decimal("0.15"),
+            Money("40.00"),
+            NOW,
+        )
+
+    def test_a_contract_with_its_own_terms(self, harness: Harness) -> None:
+        property_id = harness.create_property(harness.register_owner())
+        harness.bus.handle(
+            SignContract(
+                property_id=property_id,
+                document="contracts/a.pdf",
+                commission_rate=Decimal("0.18"),
+                owner_cleaning_charge=Decimal("35.00"),
+            )
+        )
+        contract = harness.property(property_id).contract
+        assert (contract.commission_rate, contract.owner_cleaning_charge) == (
+            Decimal("0.18"),
+            Money("35.00"),
+        )
+
+    def test_unknown_property(self, harness: Harness) -> None:
+        with pytest.raises(PropertyNotFound):
+            harness.bus.handle(ActivateProperty(property_id=new_id()))
+
+
+class TestActivation:
+    def test_activation_fails_listing_each_missing_item(self, harness: Harness) -> None:
+        property_id = harness.create_property(harness.register_owner())
+        with pytest.raises(PropertyNotReadyForActivation) as refused:
+            harness.bus.handle(ActivateProperty(property_id=property_id))
+        assert len(refused.value.missing) == len(ActivationRequirement)
+
+    def test_the_owners_bank_account_is_part_of_the_checklist(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        property_id = harness.create_property(owner_id)
+        harness.complete_profile(property_id)
+        harness.do_legal_steps(property_id)
+        with pytest.raises(PropertyNotReadyForActivation) as refused:
+            harness.bus.handle(ActivateProperty(property_id=property_id))
+        assert list(refused.value.missing) == [ActivationRequirement.BANK_ACCOUNT_VERIFIED]
+
+    def test_activation_succeeds_and_asks_the_owner_for_website_consent(
+        self, harness: Harness
+    ) -> None:
+        owner_id = harness.register_owner()
+        property_id = harness.create_property(owner_id)
+        harness.complete_profile(property_id)
+        harness.do_legal_steps(property_id)
+        harness.verify_bank_account(owner_id)
+
+        harness.bus.handle(ActivateProperty(property_id=property_id))
+
+        assert harness.property(property_id).status is PropertyStatus.ACTIVE
+        assert harness.owner(owner_id).website_consent_requested is True
+
+    def test_one_verified_account_serves_all_the_owners_properties(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        harness.verify_bank_account(owner_id)
+        for code in ("KOS-A1", "KOS-A2"):
+            property_id = harness.create_property(owner_id, code)
+            harness.complete_profile(property_id)
+            harness.do_legal_steps(property_id)
+            harness.bus.handle(ActivateProperty(property_id=property_id))
+        assert {p.status for p in harness.uow.properties.all()} == {PropertyStatus.ACTIVE}
+
+    def test_deactivate_reactivate_and_offboard(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        property_id = harness.create_property(owner_id)
+        harness.complete_profile(property_id)
+        harness.do_legal_steps(property_id)
+        harness.verify_bank_account(owner_id)
+        harness.bus.handle(ActivateProperty(property_id=property_id))
+
+        harness.bus.handle(DeactivateProperty(property_id=property_id))
+        assert harness.property(property_id).status is PropertyStatus.INACTIVE
+        harness.bus.handle(ActivateProperty(property_id=property_id))
+        assert harness.property(property_id).status is PropertyStatus.ACTIVE
+        harness.bus.handle(OffboardProperty(property_id=property_id))
+        assert harness.property(property_id).status is PropertyStatus.OFFBOARDED
+
+    def test_codes_are_normalised(self, harness: Harness) -> None:
+        property_id = harness.create_property(harness.register_owner(), " kos-b2 ")
+        assert harness.property(property_id).code == PropertyCode("KOS-B2")
+
+
+class TestFormVersions:
+    """Every command a form sends passes the form's version to the repository (ADR 0016)."""
+
+    def test_owner_commands(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        harness.bus.handle(
+            UpdateOwnerDetails(
+                owner_id=owner_id,
+                name="Μαρία",
+                email="m@example.com",
+                phone="1",
+                expected_version=7,
+            )
+        )
+        harness.bus.handle(
+            ChangeOwnerIban(owner_id=owner_id, iban=OTHER_VALID_IBAN, expected_version=8)
+        )
+        assert harness.uow.owners.expected_versions[-2:] == [7, 8]
+
+    def test_property_commands(self, harness: Harness) -> None:
+        property_id = harness.create_property(harness.register_owner())
+        harness.complete_profile(property_id, expected_version=1)
+        harness.bus.handle(
+            SignContract(property_id=property_id, document="c/s.pdf", expected_version=2)
+        )
+        harness.bus.handle(
+            RecordSubleaseDeclaration(property_id=property_id, number="ΔΥ-1", expected_version=3)
+        )
+        harness.bus.handle(AssignAma(property_id=property_id, ama_number="1", expected_version=4))
+        assert harness.uow.properties.expected_versions[-4:] == [1, 2, 3, 4]

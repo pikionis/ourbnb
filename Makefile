@@ -12,7 +12,7 @@ RUN := $(BACKEND) uv run
 MANAGE := $(RUN) python manage.py
 
 .PHONY: install up down run test test-all lint fmt typecheck lint-imports migrations-check \
-        check migrate makemigrations superuser run-jobs
+        check migrate makemigrations messages superuser run-jobs
 
 ## Set up / update the virtualenv from uv.lock
 install:
@@ -64,6 +64,10 @@ migrate:
 
 makemigrations:
 	$(MANAGE) makemigrations
+
+## Compile the Greek translations (.po -> .mo). Babel runs through uvx: not a project dependency.
+messages:
+	$(BACKEND) uvx --from babel==2.17.0 pybabel compile -i locale/el/LC_MESSAGES/django.po -o locale/el/LC_MESSAGES/django.mo -l el
 
 superuser:
 	$(MANAGE) createsuperuser

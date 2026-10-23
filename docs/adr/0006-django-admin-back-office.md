@@ -23,6 +23,14 @@ The **Django admin** is the back-office. It runs in Greek and English (`LANGUAGE
 - Login, permissions, list filters, search and translations come for free.
 - Admin forms must not bypass the domain. A ModelAdmin that saved an aggregate's status field
   directly would skip its invariants and events, so reviewers check for this.
+- A form save may send several commands (e.g. create a property, then its profile, contract and
+  ΑΜΑ). Django runs the save in one transaction and each command's Unit of Work nests in it as a
+  savepoint. If the domain refuses any of them, the whole save rolls back, files it uploaded are
+  deleted, and the page shows the reason: a form is never half-saved. Forms preview every command
+  on an unsaved copy of the aggregate first, so most refusals appear as field errors before
+  anything is stored. Admin actions send one command per selected row, each in its own unit.
+- Every change form carries the version it was rendered with; a save over someone else's newer
+  save is refused (ADR 0016).
 - Sensitive fields (lockbox codes) are shown masked. Infrastructure tables such as the outbox are
   read-only.
 - Owners and cleaners do not use the admin. Owners get the portal (ADR 0008), and cleaners get
