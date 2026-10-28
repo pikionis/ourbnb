@@ -143,19 +143,32 @@ final); one owner with many properties; unique property code, ΑΦΜ and email; 
 (right code, wrong codes up to the limit, IBAN change resets); concurrent update → conflict.
 
 ## Phase 2b — Owner onboarding portal (before Phase 3)
-Owners register and complete the checklist themselves (DOMAIN §5). Starts with the design brief.
+Owners register and complete the checklist themselves (DOMAIN §5). Design brief:
+`docs/design/owner-onboarding-brief.md`; decisions: ADR 0017 (pages), ADR 0018 (bank account).
+- [x] Design brief; technology of the owner-facing pages decided (ADR 0017, amends ADR 0008):
+      server-rendered Django pages, Django auth.
+- [x] Bank account verification decided with an ADR (0018): the admin's manual test transfer,
+      checked by the bank's payee check (VoP); an automatic sender later behind the same port,
+      which only enqueues the transfer in the outbox (ADR 0005).
 - [ ] Owner registration and login (email + password via Django auth, email verification, password
-      reset); an owner account is linked to one `Owner`.
-- [ ] Checklist pages: what is missing per property, add properties, profile forms, photo uploads.
-- [ ] Contract: download the contract, upload the signed PDF (signature done by the owner, e.g. on
-      gov.gr — never with their credentials on our side).
+      reset, invitation of owners registered by the admin); an owner account is linked to one
+      `Owner`. Emails through the outbox (`DjangoEmailSender`); login, sign-up and reset throttled.
+- [ ] Portal shell (layout, language toggle, owner-scoped access) and the checklist dashboard.
+- [ ] Owner details (step 1) and bank account: holder name, `PENDING → TRANSFER_SENT → VERIFIED`
+      with the payee check recorded by the admin; IBAN locked in the portal once verified.
+- [ ] Properties: add (code assigned automatically), profile form with photo uploads, files served
+      only to their owner; owner edits only while `ONBOARDING`.
+- [ ] Contract: the admin uploads the contract to sign (`ContractDraft`); the owner downloads it and
+      uploads the signed PDF (signature done by the owner, e.g. on gov.gr — never with their
+      credentials on our side). Sublease declaration number.
 - [ ] Paste listing text → AI extracts profile fields (`ListingTextExtractor` port, Claude adapter)
       → owner reviews. Never fetch a platform URL (DOMAIN §2.1).
-- [ ] Bank account: IBAN entry and code confirmation; choose a provider for automatic test
-      transfers (or open banking) with an ADR. The provider adapter of `BankAccountVerifier`
-      only enqueues the transfer in the outbox; the outbox worker calls the provider, never the
-      unit of work (ADR 0005).
-- [ ] Technology of the owner-facing pages decided at the start of the phase (ADR 0008 update).
+
+**Tests:** sign-up → confirmation link from the outbox → login → details → property → the checklist
+shows only the ΑΜΑ missing; an owner never sees another owner's data (404); emailed links work once
+and expire; `NO_MATCH` stops the verification; a code is refused before the transfer is sent; the
+portal refuses an IBAN change once verified and property edits after activation; the AI draft never
+contains lockbox codes and nothing is saved until the owner saves.
 
 ## Phase 3 — Reservations context & iCal sync
 Domain:
@@ -352,6 +365,10 @@ payment; stay spanning two months belongs to the check-out month; owner with 3 p
 ---
 
 ## Backlog / later
+- Automatic bank-account verification: Revolut Business API adapter (ADR 0018); open banking
+  (Enable Banking) if onboarding volume grows.
+- Owner reminders while the sublease declaration is missing (DOMAIN §5, step 4); admin
+  notifications when an owner completes onboarding steps.
 - WhatsApp templates content (Greek/English) — to be written with Petros.
 - Viber channel adapter.
 - Channel manager adapter (if volume grows).

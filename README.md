@@ -10,6 +10,7 @@ WhatsApp, λινά, επισκέπτες, εκκαθαρίσεις ιδιοκτ�
 | `docs/DOMAIN.md` | Business logic — η μία αλήθεια |
 | `docs/BUILD_PLAN.md` | Φάσεις v1 / v2 / v3 με checkboxes |
 | `docs/adr/` | Αρχιτεκτονικές αποφάσεις (γράφονται στη Phase 0) |
+| `docs/design/` | Design briefs για τις σελίδες χρηστών (π.χ. onboarding ιδιοκτητών) |
 
 ## Εργαλεία Claude Code (`.claude/`)
 | | Χρήση |

@@ -36,11 +36,14 @@ tax declarations and the owner portal.
 | Greek (business) | Code name | Meaning |
 |---|---|---|
 | Ιδιοκτήτης | `Owner` | Person who owns one or more properties and signs a contract with the IKE |
-| Τραπεζικός λογαριασμός | `BankAccount` | The owner's IBAN for payouts, verified with a test transfer |
+| Λογαριασμός ιδιοκτήτη | `OwnerAccount` | An owner's login to the owner portal, linked to one `Owner` by `owner_id` |
+| Τραπεζικός λογαριασμός | `BankAccount` | The owner's IBAN and account holder name for payouts, verified with a test transfer |
+| Έλεγχος ονόματος δικαιούχου | `PayeeCheck` | The bank's name check (Verification of Payee) when the IKE sends the test transfer |
 | Ακίνητο / διαμέρισμα | `Property` | A rentable unit managed by the IKE |
 | ΑΜΑ | `ama_number` | Short-term rental registry number issued by AADE, in the IKE's name |
 | Δήλωση υπεκμίσθωσης | `sublease_declaration_number` | AADE declaration by the owner granting sublease rights to the IKE |
 | Συμβόλαιο | `Contract` | Agreement IKE–owner: commission rate, cleaning charge, terms |
+| Συμβόλαιο προς υπογραφή | `ContractDraft` | The contract PDF and terms the IKE offers for a property; the owner signs it |
 | Κράτηση | `Reservation` | A stay booked on a channel (Airbnb, Booking, direct) |
 | Κανάλι | `Channel` | AIRBNB, BOOKING, DIRECT |
 | Επισκέπτης | `Guest` | Person staying in a property |
@@ -75,7 +78,7 @@ tax declarations and the owner portal.
 | `finance` | Core | Booking statements, owner charges, monthly payouts, accounting export |
 | `compliance` | Supporting | AADE stay declarations, deadlines, amendments, data retention |
 | `owner_portal` | Supporting | Read models for owners (CQRS read side) |
-| `identity` | Generic | Users, roles (Admin, Owner), signed links for cleaners — use Django auth |
+| `identity` | Generic | Users, roles (Admin, Owner), owner accounts (sign-up, invitation, password reset), signed links for cleaners — use Django auth |
 | `messaging` | Generic (adapter) | WhatsApp Cloud API: templates, outbound, inbound webhook |
 
 ### 4.1 Context map (events between contexts)
@@ -91,6 +94,7 @@ guests       ──EarlyCheckInAgreed / LateCheckOutAgreed────▶ reserv
 reservations ──StayEnded──────────────────────────────────▶ compliance (DeclarationDue), finance (statement ready)
 properties   ──PropertyActivated──────────────────────────▶ reservations (start iCal sync), owner_portal (ask website consent)
 properties   ──PropertyDeactivated/Reactivated/Offboarded─▶ reservations (stop/resume iCal sync), housekeeping (no new cleanings)
+properties   ──OwnerInvitedToPortal───────────────────────▶ identity (create the owner's account, email the invitation)
 ```
 
 Contexts never import each other's domain models. They communicate through events on the message bus
@@ -111,23 +115,43 @@ Fields: `id`, `name`, `email` (unique), `phone`, `afm` (ΑΦΜ, unique, 9 digits
 digit), `bank_account`, `show_on_website` (default `False`), `website_consent_requested`.
 
 ### Bank account (on the `Owner`)
-`BankAccount(iban, status)`, where the IBAN must pass the ISO 13616 check (mod 97). States:
-`UNVERIFIED` → `PENDING` → `VERIFIED`.
-- Verification proves the account exists, accepts transfers and belongs to the owner: a test
-  transfer of €0.01 is sent with a 6-digit code in its reference (`PENDING`); the owner enters the
-  code and the account becomes `VERIFIED` (`BankAccountVerified`).
-- Wrong codes are limited (configuration, default 3); after the last one the account returns to
+`BankAccount(iban, holder_name, status)`.
+- The IBAN must pass the ISO 13616 check (mod 97).
+- The holder name is the account holder's name exactly as the bank holds it, often in Latin
+  capitals, because the bank compares it (see below).
+
+States: `UNVERIFIED` → `PENDING` → `TRANSFER_SENT` → `VERIFIED` (ADR 0018).
+- Verification proves the account exists, accepts transfers and belongs to the owner.
+- Starting it (by the owner or the admin) creates a 6-digit code (`PENDING`). The IKE then sends a
+  test transfer of €0.01 with the code in its reference.
+- When the transfer is sent, the IKE's bank checks the holder name against the IBAN
+  (Verification of Payee, mandatory in the euro area since October 2025). The admin records the
+  result, a `PayeeCheck`:
+  - `MATCH`: the transfer is sent (`TRANSFER_SENT`);
+  - `CLOSE_MATCH`: the transfer is sent, and the name the bank returned becomes the holder name.
+    It is the bank's own spelling, so the verification does not restart;
+  - `NOT_POSSIBLE` (e.g. a bank outside the euro area): the admin may still send it, and the code
+    alone is then the proof;
+  - `NO_MATCH`: nothing is sent and the account returns to `UNVERIFIED`. The owner sees why and
+    corrects the name or the IBAN.
+- Once the transfer is sent, the owner enters the code from their statement and the account
+  becomes `VERIFIED` (`BankAccountVerified`). A code cannot be entered before the transfer is
+  recorded as sent.
+- Wrong codes are limited (configuration, default 3). After the last one the account returns to
   `UNVERIFIED` and a new transfer is needed.
-- Changing the IBAN returns the account to `UNVERIFIED`.
-- Who sends the test transfer is an adapter (`BankAccountVerifier` port): at first the admin, from
-  the IKE's e-banking, with the code the platform shows; later automatically through a bank or
-  payment provider (provider and ADR chosen in Phase 2b).
+- Changing the IBAN or the holder name returns the account to `UNVERIFIED`.
+  - In the owner portal the owner can change them only while the account is not `VERIFIED`.
+  - A verified account is changed by the admin, so taking over an owner's login is not enough to
+    redirect their payouts.
+- Who sends the test transfer is an adapter (`BankAccountVerifier` port). Today it is the admin,
+  from the IKE's e-banking, with the code the platform shows (ADR 0018). An automatic sender can
+  replace the admin later without changing these rules.
 
 ### Aggregate: `Property`
 Fields: `id`, `owner_id`, `code` (short, e.g. `KOS-A1`, unique), `name`, `address`, `lat`, `lng`,
 `default_check_in_time` (15:00), `default_check_out_time` (11:00), `status`, `ama_number`,
-`sublease_declaration_number`, `contract`, `check_in_guide`, `amenities`, `preferred_cleaner_id`,
-`ical_feeds` (one `url` per `channel`), `linen_par_level` (default 3).
+`sublease_declaration_number`, `contract_draft`, `contract`, `check_in_guide`, `amenities`,
+`preferred_cleaner_id`, `ical_feeds` (one `url` per `channel`), `linen_par_level` (default 3).
 
 **States:** `ONBOARDING` → `ACTIVE` ⇄ `INACTIVE`; any state → `OFFBOARDED` (final).
 Admin labels: Σε εξέλιξη · Ενεργό · Ανενεργό · Αποχώρησε. The admin list of properties filters by
@@ -151,12 +175,12 @@ admin adds the feeds when the IKE's listing exists.
 
 | # | Who | Action | Event |
 |---|---|---|---|
-| 1 | Owner (or admin) | Registers: name, email, phone, ΑΦΜ, IBAN | `OwnerRegistered` |
+| 1 | Owner (or admin) | Registers: name, email, phone, ΑΦΜ, IBAN and account holder name | `OwnerRegistered` |
 | 2 | Owner (or admin) | Adds a property and completes its profile (guide, amenities, photos). Listing text may be pasted and parsed by AI into fields; the platform never fetches a listing from a platform URL (§2.1) | `PropertyProfileCompleted` |
-| 3 | Owner | Signs the contract (e.g. digitally on gov.gr, by the owner themself; provider to be confirmed with the lawyer) and uploads the signed PDF | `ContractSigned` |
+| 3 | Admin, then owner | The admin uploads the contract to sign; the owner signs it (e.g. digitally on gov.gr, by the owner themself; provider to be confirmed with the lawyer) and uploads the signed PDF | `ContractOffered`, `ContractSigned` |
 | 4 | Owner or owner's accountant | Files the sublease declaration at AADE; the number is recorded. Reminders while missing | `SubleaseDeclared` |
 | 5 | Admin | Registers the property in the AADE registry with the IKE's credentials; records the ΑΜΑ | `AmaAssigned` |
-| 6 | Owner + admin | Verifies the bank account (test transfer + code) | `BankAccountVerified` |
+| 6 | Owner + admin | Verifies the bank account (test transfer with the bank's payee check + code) | `BankAccountVerified` |
 | 7 | Admin | Checks the checklist, activates | `PropertyActivated` |
 
 After the property's first `PropertyActivated`, the owner is asked (in their profile) whether
@@ -167,6 +191,46 @@ Later states: `ACTIVE` → `INACTIVE` (`PropertyDeactivated`, e.g. paused by the
 `OFFBOARDED` (`PropertyOffboarded`, final). While a property is not `ACTIVE` it gets no iCal sync
 and no new cleanings.
 
+### Contract to sign (`ContractDraft`)
+- The admin prepares a property's contract and uploads it as a PDF, with its terms: the commission
+  rate and the owner cleaning charge, the configured defaults being proposed (`ContractOffered`).
+- The owner downloads it, signs it themself, and uploads the signed PDF. The property's
+  `Contract` then records the draft's terms, the signed PDF and the time of the upload
+  (`ContractSigned`).
+- In the portal, a signed contract can be uploaded only when a draft exists.
+- A new draft replaces the previous one; it does not undo a signed contract.
+- The admin can still record a contract signed another way (e.g. on paper) directly, with its
+  terms.
+
+### Owner portal (Phase 2b, ADR 0017)
+Owners complete their checklist themselves on the owner portal.
+- **Sign-up.** Email and password; the email is confirmed by a link before the account can log in.
+  - The account reserves the id of the owner it will be linked to. The owner then registers
+    (onboarding step 1) with that id and the account's email.
+  - One account per owner, and one owner per account.
+- **Invitation.** The admin can invite an owner they registered (`OwnerInvitedToPortal`).
+  - The emailed link lets the owner choose a password, which also confirms the email.
+  - Inviting again while the invitation is open sends a new link.
+  - An owner whose account is already active uses "forgot password" instead.
+- **No automatic linking.** Registering with a ΑΦΜ or email that another owner already has is
+  refused with "contact us". An account never links itself to an existing owner: knowing someone's
+  ΑΦΜ must not give access to their data.
+- **Links.** Links sent by email (confirmation, invitation, password reset) work once and expire
+  (configuration: by default 3 days, and 1 day for a password reset).
+- **What the owner can change.**
+  - An owner sees and changes only their own data.
+  - Name and phone, at any time. The email is the login and is changed through the IKE. The ΑΦΜ is
+    given at registration.
+  - A property, only while it is `ONBOARDING`; after that, changes go through the IKE.
+  - Never the ΑΜΑ, calendar feeds, preferred cleaner, linen par level or default check-in/out times,
+    which the IKE sets.
+- **Property code.** A property added by an owner gets its code automatically: the configured
+  prefix and the next number (e.g. `KOS-014`).
+- **Listing text.** Listing text pasted by the owner may be read by the AI into a draft of the
+  profile (§2.4). The owner reviews it before anything is saved. The AI never fills in lockbox
+  codes, and no URL is fetched (§2.1).
+- **Files.** Uploaded files (photos, contracts) are visible only to their owner and the admin.
+
 ### Value objects
 - `CheckInGuide(directions_el, directions_en, map_url, exterior_photo, lockbox_photo,
   guest_lockbox_code, cleaner_lockbox_code)`. Lockbox codes are encrypted at rest (§2.3); the
@@ -174,6 +238,10 @@ and no new cleanings.
 - `Contract(commission_rate=Decimal("0.15"), owner_cleaning_charge=Money("40.00"), signed_at,
   document)` — defaults are configuration. One contract per property until the lawyer says
   otherwise (§14).
+- `ContractDraft(document, commission_rate, owner_cleaning_charge)` — the PDF to sign and its
+  terms, under the same rules as a contract's terms.
+- `PayeeCheck(result, bank_name)` — `MATCH`, `CLOSE_MATCH` (with the name the bank returned),
+  `NOT_POSSIBLE` or `NO_MATCH`.
 - `Amenities` — structured list of included / not included items, used by the AI to answer guests.
 - `IcalFeed(channel, url)` — one per channel (Airbnb, Booking.com), https only.
 - Concurrent changes to one aggregate are detected with a version number (ADR 0016).
@@ -196,6 +264,14 @@ with `/domain-change` if the business wants otherwise.
   an `ACTIVE` property must keep a complete profile (`ProfileMustStayComplete`); an `INACTIVE`
   one may have gaps, and its return to `ACTIVE` checks the whole checklist again.
 - The cleaners' own lockbox code can be removed again, so cleaners go back to the guests' code.
+
+### Validation details (Phase 2b — to be confirmed by Petros)
+- Account holder name: required, in any script, at most 70 characters (the SEPA limit for a payee
+  name). Surrounding spaces are trimmed and repeated spaces collapsed.
+- Property codes given automatically: `<prefix>-<number>`, with the number padded to 3 digits
+  (`KOS-001`). The prefix (`KOS`) and the width are configuration. The next number is one more than
+  the highest number in use with that prefix, so a code is never reused.
+- A `CLOSE_MATCH` payee check needs the name the bank returned; the other results take none.
 
 ---
 
@@ -452,7 +528,8 @@ Cancelled without payment → no statement. Cancelled with a cancellation paymen
 
 ## 12. Owner portal (phase 3, read side)
 
-Owners log in and see: their properties and onboarding status, reservations, money per reservation,
+Owners log in (the login and the onboarding pages exist since Phase 2b, ADR 0017) and see: their
+properties and onboarding status, reservations, money per reservation,
 payouts, approved issues/charges, documents (contract, declarations), website-consent setting.
 Built as read models (queries), never touching aggregates directly.
 
@@ -472,5 +549,5 @@ properties, owners with `show_on_website = True` (name/logo), testimonials, mana
 - ΑΜΑ under the sublease model: always a new ΑΜΑ in the IKE's name, or can an owner's existing ΑΜΑ
   be used? — accountant/lawyer.
 - One contract per owner or one per property? — lawyer.
-- Provider for automatic bank-account verification transfers (or open banking) — Phase 2b.
+- Privacy notice for owner accounts (GDPR Art. 13) — lawyer.
 - Whether the WhatsApp `wa.me` link survives Airbnb's message filter (test on a real booking).

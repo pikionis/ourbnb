@@ -1,6 +1,7 @@
 # 0008 — Owner portal: React + Vite + TypeScript on a Django Ninja API (v3)
 
-- Status: accepted
+- Status: accepted; amended by 0017 (owner onboarding pages and the owner login are built in
+  Phase 2b, server-rendered)
 - Date: 2026-10-22
 
 ## Context
@@ -19,7 +20,8 @@ English. It talks to a JSON API built with Django Ninja in the `owner_portal` co
 - The API serves **read models** (the CQRS read side, Cosmic Python ch. 12) and never loads or
   changes aggregates directly.
 - Writes, such as the website-consent toggle, are commands dispatched on the message bus.
-- Authentication uses Django auth: email + password, with password reset.
+- Authentication uses Django auth: email + password, with password reset. It is built in Phase 2b
+  with the onboarding pages (ADR 0017).
 - The portal is built in Phase 12.
 
 ## Consequences
