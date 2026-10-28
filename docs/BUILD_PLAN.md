@@ -172,15 +172,15 @@ contains lockbox codes and nothing is saved until the owner saves.
 
 ## Phase 3 — Reservations context & iCal sync
 Domain:
-- [ ] `ReservationCalendar` aggregate, one per property, with `Reservation` entities (DOMAIN §6).
+- [x] `ReservationCalendar` aggregate, one per property, with `Reservation` entities (DOMAIN §6).
       `Channel` enum. Overlap check `ReservationCalendar.accept(...)`, raising
       `OverlappingReservation`.
 - [ ] Properties → reservations: `PropertyCalendarSettingsChanged` carries the code, name, ACTIVE,
       default times and feeds into the calendar's own copy. A command announces the existing
       properties.
-- [ ] Events `ReservationImported`, `ReservationRescheduled`, `ReservationCancelled`, `StayEnded`,
+- [x] Events `ReservationImported`, `ReservationRescheduled`, `ReservationCancelled`, `StayEnded`,
       `CalendarEventNeedsReview`, `CalendarFeedFailing`.
-- [ ] `CalendarDiff` domain service: given stored reservations and imported events → list of events
+- [x] `CalendarDiff` domain service: given stored reservations and imported events → list of events
       (new / rescheduled / cancelled). Pure function, heavily unit-tested.
 
 Adapters:
