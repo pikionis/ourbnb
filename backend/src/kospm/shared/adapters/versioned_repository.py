@@ -15,6 +15,11 @@ Subclasses set `model`, map rows to aggregates (passing every loaded aggregate t
 (everything but its id and `version`). The domain never sees the version. The aggregate's id is
 stored in the column `id_field`: the primary key `id` by default, another unique column when the
 table's key belongs to the framework (e.g. `identity.User`).
+
+An aggregate with child rows in other tables (e.g. a calendar's reservations) also puts a
+comparable snapshot of its children in `_values()`, under keys that `_columns()` leaves out, and
+writes them in `_write_children()`. A change to a child then bumps the root's version like any
+other change, so the version guards the whole aggregate.
 """
 
 import abc
@@ -51,6 +56,13 @@ class VersionedDjangoRepository[A: Aggregate[Any]](TrackingRepository[A]):
     def _values(self, aggregate: A) -> dict[str, Any]:
         """Column values of `aggregate` (all but `id` and `version`), comparable with ==."""
 
+    def _columns(self, values: dict[str, Any]) -> dict[str, Any]:
+        """The values that are columns of the aggregate's row (by default all of them)."""
+        return values
+
+    def _write_children(self, aggregate: A) -> None:
+        """Write the aggregate's child rows, after its own row (by default it has none)."""
+
     def _load(self, aggregate: A, version: int, *, expected_version: int | None = None) -> A:
         """Track a freshly mapped aggregate and remember what was read; returns what to hand out.
 
@@ -75,7 +87,10 @@ class VersionedDjangoRepository[A: Aggregate[Any]](TrackingRepository[A]):
         values = self._values(aggregate)
         try:
             with transaction.atomic(using=self.using):  # a savepoint: the unit stays usable
-                self._rows().create(**{self.id_field: aggregate.id}, version=0, **values)
+                self._rows().create(
+                    **{self.id_field: aggregate.id}, version=0, **self._columns(values)
+                )
+                self._write_children(aggregate)
         except IntegrityError as error:
             raise self._duplicate(aggregate, error) from error
         self._snapshots[aggregate.id] = _Snapshot(0, values)
@@ -90,7 +105,8 @@ class VersionedDjangoRepository[A: Aggregate[Any]](TrackingRepository[A]):
         snapshot = self._snapshots[aggregate.id]
         values = self._values(aggregate)
         if values != snapshot.values:
-            self._write(aggregate, snapshot, version=snapshot.version + 1, **values)
+            self._write(aggregate, snapshot, version=snapshot.version + 1, **self._columns(values))
+            self._write_children(aggregate)
             self._snapshots[aggregate.id] = _Snapshot(snapshot.version + 1, values)
         elif snapshot.confirm:
             self._write(aggregate, snapshot, version=snapshot.version)

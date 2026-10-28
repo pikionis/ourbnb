@@ -19,6 +19,7 @@ from uuid import UUID
 from kospm.properties.domain.codes import PropertyCodeSeries
 from kospm.properties.domain.commands import (
     ActivateProperty,
+    AnnounceCalendarSettings,
     AssignAma,
     ChangeBankAccount,
     ConfirmBankAccount,
@@ -401,6 +402,12 @@ def offboard_property(cmd: OffboardProperty, uow: PropertiesUnitOfWork) -> None:
         uow.commit()
 
 
+def announce_calendar_settings(cmd: AnnounceCalendarSettings, uow: PropertiesUnitOfWork) -> None:
+    with uow:
+        uow.properties.get(cmd.property_id).announce_calendar_settings()
+        uow.commit()
+
+
 # --- events --------------------------------------------------------------------------------------
 
 
@@ -473,6 +480,7 @@ COMMAND_HANDLERS: dict[type[Command], Callable[..., None]] = {
     ActivateProperty: activate_property,
     DeactivateProperty: deactivate_property,
     OffboardProperty: offboard_property,
+    AnnounceCalendarSettings: announce_calendar_settings,
 }
 
 EVENT_HANDLERS: dict[type[DomainEvent], list[Callable[..., None]]] = {

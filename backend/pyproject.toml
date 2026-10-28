@@ -19,6 +19,12 @@ dependencies = [
     # Claude API: reads an owner's pasted listing text into a draft profile (Phase 2b,
     # ListingTextExtractor adapter; approved by Petros). 2.x is the SDK the adapter is written for.
     "anthropic>=2.3,<3",
+    # iCalendar parsing of the platforms' calendar feeds (Phase 3, ICalParser adapter; named in
+    # the BUILD_PLAN). 7.x is the API the parser is written for.
+    "icalendar>=7.3,<8",
+    # HTTP client of the iCal fetcher (timeout, ETag). Already installed with the Claude SDK;
+    # declared because the fetcher uses it directly (Phase 3, approved by Petros).
+    "httpx2>=2.16,<3",
 ]
 
 [dependency-groups]

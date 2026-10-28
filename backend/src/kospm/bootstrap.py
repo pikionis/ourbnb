@@ -51,10 +51,22 @@ from kospm.properties.adapters.listing_extractor import (
 from kospm.properties.adapters.unit_of_work import DjangoPropertiesUnitOfWork
 from kospm.properties.domain.codes import PropertyCodeSeries
 from kospm.properties.domain.defaults import BankVerificationPolicy, PropertyDefaults
-from kospm.properties.domain.events import OwnerEmailChanged, OwnerRegistered
+from kospm.properties.domain.events import (
+    OwnerEmailChanged,
+    OwnerRegistered,
+    PropertyCalendarSettingsChanged,
+)
 from kospm.properties.domain.listing import ListingTextPolicy
 from kospm.properties.service_layer import handlers as properties_handlers
 from kospm.properties.service_layer.ports import ListingTextExtractor
+from kospm.reservations.adapters.alerts import OutboxAdminAlerts
+from kospm.reservations.adapters.ical import HttpICalFetcher, ICalendarParser
+from kospm.reservations.adapters.unit_of_work import DjangoReservationsUnitOfWork
+from kospm.reservations.domain.commands import UpdatePropertyCalendar
+from kospm.reservations.domain.policies import FeedHealthPolicy
+from kospm.reservations.service_layer import handlers as reservations_handlers
+from kospm.reservations.service_layer.ports import ICalFetcher
+from kospm.reservations.service_layer.unit_of_work import ReservationsUnitOfWork
 from kospm.shared.adapters.throttle import Throttle, ThrottlePolicy
 from kospm.shared.clock import Clock, SystemClock
 from kospm.shared.domain import Command, DomainEvent, Money, new_id
@@ -217,6 +229,16 @@ def default_contexts(clock: Clock) -> list[ContextWiring]:
             command_handlers=identity_handlers.COMMAND_HANDLERS,
             event_handlers={**identity_handlers.EVENT_HANDLERS, **IDENTITY_TRANSLATIONS},
             dependencies=identity_dependencies(clock),
+        ),
+        ContextWiring(
+            name="reservations",
+            uow=DjangoReservationsUnitOfWork(outbox=DjangoOutbox(clock)),
+            command_handlers=reservations_handlers.COMMAND_HANDLERS,
+            event_handlers={
+                **reservations_handlers.EVENT_HANDLERS,
+                **RESERVATIONS_TRANSLATIONS,
+            },
+            dependencies=reservations_dependencies(),
         ),
     ]
 
@@ -392,6 +414,73 @@ def follow_owner_email_when_changed(event: OwnerEmailChanged, uow: IdentityUnitO
 IDENTITY_TRANSLATIONS: dict[type[DomainEvent], list[Callable[..., None]]] = {
     OwnerRegistered: [note_owner_registered_when_registered],
     OwnerEmailChanged: [follow_owner_email_when_changed],
+}
+
+
+# --- Reservations (DOMAIN §6) --------------------------------------------------------------------
+
+
+def reservations_dependencies() -> dict[str, object]:
+    """The adapters and policy of the reservations handlers, from the settings."""
+    return {
+        "ical_fetcher": ical_fetcher(),
+        "ical_parser": ICalendarParser(),
+        "feed_health": feed_health_policy(),
+        "admin_alerts": OutboxAdminAlerts(whatsapp_number=str(settings.ADMIN_WHATSAPP_NUMBER)),
+    }
+
+
+def ical_fetcher() -> ICalFetcher:
+    """Reads feeds over HTTPS (ICAL_FETCH_TIMEOUT_SECONDS, ICAL_MAX_BYTES)."""
+    try:
+        timeout, max_bytes = (
+            float(settings.ICAL_FETCH_TIMEOUT_SECONDS),
+            int(settings.ICAL_MAX_BYTES),
+        )
+    except (TypeError, ValueError) as error:
+        raise ImproperlyConfigured(f"invalid ICAL_FETCH_*: {error}") from error
+    if timeout <= 0 or max_bytes <= 0:
+        raise ImproperlyConfigured("ICAL_FETCH_TIMEOUT_SECONDS and ICAL_MAX_BYTES are positive")
+    return _http_ical_fetcher(timeout, max_bytes)
+
+
+@functools.lru_cache(maxsize=1)
+def _http_ical_fetcher(timeout: float, max_bytes: int) -> HttpICalFetcher:
+    """One fetcher per process, so its HTTP connections are reused."""
+    return HttpICalFetcher(timeout=timeout, max_bytes=max_bytes)
+
+
+def feed_health_policy() -> FeedHealthPolicy:
+    """When a failing feed alerts the admin (ICAL_ALERT_AFTER_MINUTES)."""
+    try:
+        minutes = int(settings.ICAL_ALERT_AFTER_MINUTES)
+        return FeedHealthPolicy(alert_after=timedelta(minutes=minutes))
+    except (TypeError, ValueError) as error:
+        raise ImproperlyConfigured(f"invalid ICAL_ALERT_AFTER_MINUTES: {error}") from error
+
+
+# Properties' announcement becomes reservations' own command (ADR 0014; DOMAIN §4.1).
+
+
+def update_calendar_when_settings_changed(
+    event: PropertyCalendarSettingsChanged, uow: ReservationsUnitOfWork
+) -> None:
+    reservations_handlers.update_property_calendar(
+        UpdatePropertyCalendar(
+            property_id=event.property_id,
+            code=event.code,
+            name=event.name,
+            active=event.active,
+            check_in_time=event.check_in_time,
+            check_out_time=event.check_out_time,
+            feeds=event.ical_feeds,
+        ),
+        uow,
+    )
+
+
+RESERVATIONS_TRANSLATIONS: dict[type[DomainEvent], list[Callable[..., None]]] = {
+    PropertyCalendarSettingsChanged: [update_calendar_when_settings_changed],
 }
 
 

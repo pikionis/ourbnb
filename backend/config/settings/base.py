@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     # Bounded contexts
     "kospm.identity",
     "kospm.properties",
+    "kospm.reservations",
 ]
 
 MIDDLEWARE = [
@@ -145,6 +146,17 @@ LISTING_EXTRACTOR_TIMEOUT_SECONDS = 60
 # The longest text sent in one reading, and the readings allowed per owner per hour (cost).
 LISTING_TEXT_MAX_CHARS = 20_000
 LISTING_READINGS_PER_HOUR = 10
+
+# --- Reservations: iCal sync and admin alerts (DOMAIN §6, ADR 0004) ----------------------------
+# The sync runs every 30 minutes from the scheduler (deploy/crontab, Phase 7; locally run-jobs).
+
+# A failing feed alerts the admin after failing for this long (default 2 h, about 4 syncs).
+ICAL_ALERT_AFTER_MINUTES = env.int("ICAL_ALERT_AFTER_MINUTES", default=120)
+# One feed read: how long to wait, and the largest feed accepted.
+ICAL_FETCH_TIMEOUT_SECONDS = 20
+ICAL_MAX_BYTES = 5 * 1024 * 1024
+# Where admin alerts go by WhatsApp, international format (e.g. +3069...). Empty: only logged.
+ADMIN_WHATSAPP_NUMBER = env.str("ADMIN_WHATSAPP_NUMBER", default="")
 
 # --- Email: delivered by the outbox worker through this backend (ADR 0005, 0017) ---------------
 

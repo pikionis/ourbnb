@@ -17,6 +17,92 @@ msgstr "Οι καθαριστές χρησιμοποιούν ξανά τον κ�
 msgid "The verification of your bank account is under way: to start it again, contact us."
 msgstr "Η επαλήθευση του τραπεζικού σας λογαριασμού είναι σε εξέλιξη: για να ξεκινήσει ξανά, επικοινωνήστε μαζί μας."
 
+# --- reservations: tables, columns and choices (Phase 3) ---------------------------------------
+
+msgid "Block"
+msgstr "Κλείσιμο ημερομηνιών"
+
+msgid "Cancelled"
+msgstr "Ακυρωμένη"
+
+msgid "Confirmed"
+msgstr "Επιβεβαιωμένη"
+
+msgid "Direct"
+msgstr "Απευθείας"
+
+msgid "Overlaps a reservation"
+msgstr "Επικαλύπτει κράτηση"
+
+msgid "Reservation"
+msgstr "Κράτηση"
+
+msgid "Reservation or block?"
+msgstr "Κράτηση ή κλείσιμο ημερομηνιών;"
+
+msgid "Reservations"
+msgstr "Κρατήσεις"
+
+msgid "active"
+msgstr "ενεργό"
+
+msgid "admin alerted"
+msgstr "ο διαχειριστής ειδοποιήθηκε"
+
+msgid "calendar event"
+msgstr "συμβάν ημερολογίου"
+
+msgid "calendar event to review"
+msgstr "συμβάν ημερολογίου για έλεγχο"
+
+msgid "calendar events to review"
+msgstr "συμβάντα ημερολογίου για έλεγχο"
+
+msgid "calendar feed"
+msgstr "ημερολόγιο iCal"
+
+msgid "calendar link"
+msgstr "σύνδεσμος ημερολογίου"
+
+msgid "check-in"
+msgstr "άφιξη"
+
+msgid "check-out"
+msgstr "αναχώρηση"
+
+msgid "confirmation code"
+msgstr "κωδικός κράτησης"
+
+msgid "empty calendar confirmed"
+msgstr "επιβεβαιώθηκε ότι το ημερολόγιο είναι κενό"
+
+msgid "failing since"
+msgstr "αποτυγχάνει από"
+
+msgid "guest"
+msgstr "επισκέπτης"
+
+msgid "last synced"
+msgstr "τελευταίος συγχρονισμός"
+
+msgid "property calendar"
+msgstr "ημερολόγιο ακινήτου"
+
+msgid "property calendars"
+msgstr "ημερολόγια ακινήτων"
+
+msgid "reason"
+msgstr "αιτία"
+
+msgid "reservation"
+msgstr "κράτηση"
+
+msgid "reservations"
+msgstr "κρατήσεις"
+
+msgid "stay ended"
+msgstr "η διαμονή έληξε"
+
 # --- properties: listing text read by the AI (Phase 2b, step 5) --------------------------------
 
 msgid "An AI assistant (Claude, by Anthropic) reads the text to fill in the form; we do not keep the text. Reading usually takes less than a minute. Do not paste key box codes or passwords."

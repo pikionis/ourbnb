@@ -3,3 +3,4 @@
 *.jpg binary
 *.pdf binary
 *.mo binary
+*.ics -text

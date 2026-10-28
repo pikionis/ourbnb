@@ -404,6 +404,7 @@ def test_the_production_contexts_are_the_bounded_contexts_built_so_far() -> None
     assert [context.name for context in default_contexts(FixedClock(NOW))] == [
         "properties",
         "identity",
+        "reservations",
     ]
 
 

@@ -175,7 +175,7 @@ Domain:
 - [x] `ReservationCalendar` aggregate, one per property, with `Reservation` entities (DOMAIN §6).
       `Channel` enum. Overlap check `ReservationCalendar.accept(...)`, raising
       `OverlappingReservation`.
-- [ ] Properties → reservations: `PropertyCalendarSettingsChanged` carries the code, name, ACTIVE,
+- [x] Properties → reservations: `PropertyCalendarSettingsChanged` carries the code, name, ACTIVE,
       default times and feeds into the calendar's own copy. A command announces the existing
       properties.
 - [x] Events `ReservationImported`, `ReservationRescheduled`, `ReservationCancelled`, `StayEnded`,
@@ -184,12 +184,12 @@ Domain:
       (new / rescheduled / cancelled). Pure function, heavily unit-tested.
 
 Adapters:
-- [ ] `ICalFetcher` port; `HttpICalFetcher` (httpx2, timeout, ETag support) and `FileICalFetcher` (tests).
-- [ ] `ICalParser` (library `icalendar`) → `ImportedCalendarEvent`; per-channel classifiers
+- [x] `ICalFetcher` port; `HttpICalFetcher` (httpx2, timeout, ETag support) and `FileICalFetcher` (tests).
+- [x] `ICalParser` (library `icalendar`) → `ImportedCalendarEvent`; per-channel classifiers
       (`AirbnbClassifier`, `BookingClassifier`) deciding reservation vs block vs unknown. An unknown
       event that mirrors another channel's reservation is a block; the admin's answers are
       remembered by UID.
-- [ ] Admin alerts (feed failing, event to review, overlap) by WhatsApp to `ADMIN_WHATSAPP_NUMBER`
+- [x] Admin alerts (feed failing, event to review, overlap) by WhatsApp to `ADMIN_WHATSAPP_NUMBER`
       through the outbox.
 - [ ] Management command `sync_calendars` (all active properties); scheduled every 30 min.
 - [ ] Feed health (DOMAIN §6): a failed or empty-with-future-reservations sync changes nothing;

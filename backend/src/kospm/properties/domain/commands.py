@@ -174,3 +174,11 @@ class DeactivateProperty(Command):
 @dataclass(frozen=True, kw_only=True)
 class OffboardProperty(Command):
     property_id: UUID
+
+
+@dataclass(frozen=True, kw_only=True)
+class AnnounceCalendarSettings(Command):
+    """Tell the reservations context about a property again (DOMAIN §4.1): for the properties
+    that existed before the reservations context did."""
+
+    property_id: UUID
