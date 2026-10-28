@@ -17,6 +17,101 @@ msgstr "Οι καθαριστές χρησιμοποιούν ξανά τον κ�
 msgid "The verification of your bank account is under way: to start it again, contact us."
 msgstr "Η επαλήθευση του τραπεζικού σας λογαριασμού είναι σε εξέλιξη: για να ξεκινήσει ξανά, επικοινωνήστε μαζί μας."
 
+# --- reservations: the admin (Phase 3) ---------------------------------------------------------
+
+msgid "%(event)s overlaps a reservation: resolve it on the platforms."
+msgstr "%(event)s: επικαλύπτει κράτηση· λύστε το στις πλατφόρμες."
+
+msgid "Answer with “reservation” or “block”."
+msgstr "Απαντήστε «κράτηση» ή «κλείσιμο ημερομηνιών»."
+
+msgid "Cancel the selected direct reservations"
+msgstr "Ακύρωση των επιλεγμένων απευθείας κρατήσεων"
+
+msgid "Choose Airbnb or Booking.com."
+msgstr "Επιλέξτε Airbnb ή Booking.com."
+
+msgid "Confirm that the calendar is empty"
+msgstr "Επιβεβαίωση ότι το ημερολόγιο είναι κενό"
+
+msgid "Confirmed: the calendars were read again."
+msgstr "Επιβεβαιώθηκε· τα ημερολόγια διαβάστηκαν ξανά."
+
+msgid "Empty calendar confirmed"
+msgstr "Επιβεβαιωμένο κενό ημερολόγιο"
+
+msgid "Empty: the property's time."
+msgstr "Κενό: η ώρα του ακινήτου."
+
+msgid "Failing since %(since)s"
+msgstr "Αποτυγχάνει από %(since)s"
+
+msgid "From the platform's calendar."
+msgstr "Από το ημερολόγιο της πλατφόρμας."
+
+msgid "It is a block (closed dates)"
+msgstr "Είναι κλείσιμο ημερομηνιών"
+
+msgid "It is a reservation"
+msgstr "Είναι κράτηση"
+
+msgid "Not read yet"
+msgstr "Δεν έχει διαβαστεί ακόμα"
+
+msgid "OK"
+msgstr "Εντάξει"
+
+msgid "Reservations does not know this property yet."
+msgstr "Οι κρατήσεις δεν γνωρίζουν ακόμα αυτό το ακίνητο."
+
+msgid "Sync now"
+msgstr "Συγχρονισμός τώρα"
+
+msgid "The calendar event has no identifier."
+msgstr "Το συμβάν του ημερολογίου δεν έχει αναγνωριστικό."
+
+msgid "The calendar link is missing."
+msgstr "Λείπει ο σύνδεσμος του ημερολογίου."
+
+msgid "The check-out date comes after the check-in date."
+msgstr "Η ημερομηνία αναχώρησης είναι μετά την ημερομηνία άφιξης."
+
+msgid "The dates of an Airbnb or Booking.com reservation change on the platform, and its calendar brings them here. Here you change its times and the guest's name."
+msgstr "Οι ημερομηνίες μιας κράτησης Airbnb ή Booking.com αλλάζουν στην πλατφόρμα και το ημερολόγιό της τις φέρνει εδώ. Εδώ αλλάζετε τις ώρες και το όνομα του επισκέπτη."
+
+msgid "The property has no calendar link for this platform."
+msgstr "Το ακίνητο δεν έχει σύνδεσμο ημερολογίου για αυτή την πλατφόρμα."
+
+msgid "The reservation was not found, or it is cancelled."
+msgstr "Η κράτηση δεν βρέθηκε ή είναι ακυρωμένη."
+
+msgid "These dates overlap another reservation of the property."
+msgstr "Οι ημερομηνίες επικαλύπτονται με άλλη κράτηση του ακινήτου."
+
+msgid "This calendar event no longer waits for an answer."
+msgstr "Αυτό το συμβάν του ημερολογίου δεν περιμένει πια απάντηση."
+
+msgid "health"
+msgstr "κατάσταση"
+
+msgid "nights"
+msgstr "νύχτες"
+
+msgid "%(count)d answer saved."
+msgid_plural "%(count)d answers saved."
+msgstr[0] "Αποθηκεύτηκε %(count)d απάντηση."
+msgstr[1] "Αποθηκεύτηκαν %(count)d απαντήσεις."
+
+msgid "%(count)d calendar read."
+msgid_plural "%(count)d calendars read."
+msgstr[0] "Διαβάστηκε %(count)d ημερολόγιο."
+msgstr[1] "Διαβάστηκαν %(count)d ημερολόγια."
+
+msgid "%(count)d reservation cancelled."
+msgid_plural "%(count)d reservations cancelled."
+msgstr[0] "Ακυρώθηκε %(count)d κράτηση."
+msgstr[1] "Ακυρώθηκαν %(count)d κρατήσεις."
+
 # --- reservations: tables, columns and choices (Phase 3) ---------------------------------------
 
 msgid "Block"

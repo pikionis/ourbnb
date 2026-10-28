@@ -191,12 +191,12 @@ Adapters:
       remembered by UID.
 - [x] Admin alerts (feed failing, event to review, overlap) by WhatsApp to `ADMIN_WHATSAPP_NUMBER`
       through the outbox.
-- [ ] Management command `sync_calendars` (all active properties); scheduled every 30 min.
-- [ ] Feed health (DOMAIN §6): a failed or empty-with-future-reservations sync changes nothing;
+- [x] Management command `sync_calendars` (all active properties); scheduled every 30 min.
+- [x] Feed health (DOMAIN §6): a failed or empty-with-future-reservations sync changes nothing;
       `CalendarFeedFailing` after the alert threshold (configuration, default 2 h) → one admin
       WhatsApp alert per incident; admin action "Confirm empty calendar".
-- [ ] Management command `emit_stay_ended` daily at 12:00 Athens.
-- [ ] Admin: reservations list with filters (property, channel, dates, status), manual create/edit
+- [x] Management command `emit_stay_ended` daily at 12:00 Athens.
+- [x] Admin: reservations list with filters (property, channel, dates, status), manual create/edit
       (channel DIRECT), "review queue" for unclassified calendar events, edit check-in/out times.
 
 **Tests (fixtures in `tests/fixtures/ical/`):** first import creates reservations; second identical
