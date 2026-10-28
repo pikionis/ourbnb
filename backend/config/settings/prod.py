@@ -16,6 +16,14 @@ FERNET_KEYS = env.list("FERNET_KEYS")
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
 
+# The owner portal's address: links in emails start with it (ADR 0017).
+PORTAL_BASE_URL = env.str("PORTAL_BASE_URL")
+# Emails leave through SMTP; the provider is chosen with the deploy (Phase 7). Format, e.g.
+# smtp+tls://USER:PASSWORD@HOST:587 (django-environ's email_url).
+vars().update(env.email_url("EMAIL_URL"))
+# Caddy appends the visitor's address to X-Forwarded-For (ADR 0010); throttling reads it.
+PORTAL_CLIENT_IP_HEADER = "HTTP_X_FORWARDED_FOR"
+
 # Caddy terminates TLS and redirects HTTP to HTTPS; it tells Django the original scheme.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = True

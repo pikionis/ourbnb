@@ -19,7 +19,11 @@ from kospm.properties.domain.errors import (
     BankVerificationNotStarted,
     InvalidValue,
 )
-from kospm.properties.domain.events import BankAccountVerified, OwnerRegistered
+from kospm.properties.domain.events import (
+    BankAccountVerified,
+    OwnerEmailChanged,
+    OwnerRegistered,
+)
 from kospm.properties.domain.value_objects import Afm, Email, Iban
 from kospm.shared.domain import Aggregate
 
@@ -95,9 +99,11 @@ class Owner(Aggregate[UUID]):
         return self.bank_account.status is BankAccountStatus.VERIFIED
 
     def update_details(self, *, name: str, email: Email, phone: str) -> None:
-        self.name = _required(name, "name")
-        self.email = email
-        self.phone = _required(phone, "phone")
+        name, phone = _required(name, "name"), _required(phone, "phone")
+        if email != self.email:
+            # The owner's portal invitation, if not used yet, follows the corrected address.
+            self.events.append(OwnerEmailChanged(owner_id=self.id, email=email.value))
+        self.name, self.email, self.phone = name, email, phone
 
     def change_iban(self, iban: Iban) -> None:
         """A different account must be verified again; the same one keeps its verification."""

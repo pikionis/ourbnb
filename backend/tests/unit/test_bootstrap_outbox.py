@@ -9,11 +9,12 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+from django.core.mail import EmailMessage
 from django.test import override_settings
 
 from kospm.bootstrap import OutboxWorker, build_outbox_worker
 from kospm.shared.clock import FixedClock, SystemClock
-from kospm.shared.outbox.adapters import ConsoleSender, DjangoOutbox, DjangoOutboxUnitOfWork
+from kospm.shared.outbox.adapters import ChannelRouter, DjangoOutbox, DjangoOutboxUnitOfWork
 from kospm.shared.outbox.domain import (
     OutboxChannel,
     OutboxEntry,
@@ -86,15 +87,37 @@ def test_without_a_clock_the_worker_reads_the_system_clock() -> None:
 # --- the sender ---------------------------------------------------------------------------------
 
 
-def test_the_console_sender_writes_to_the_given_stdout() -> None:
+def test_whatsapp_messages_are_printed_to_the_given_stdout() -> None:
     stdout = io.StringIO()
     worker = build_outbox_worker(stdout=stdout, clock=FixedClock(NOW))
 
     worker.sender.send(MESSAGE)
 
-    assert isinstance(worker.sender, ConsoleSender)
+    assert isinstance(worker.sender, ChannelRouter)
     assert "cleaning_assigned" in stdout.getvalue()
     assert "Μαρία" in stdout.getvalue()
+
+
+def test_emails_go_through_djangos_email_backend(mailoutbox: list[EmailMessage]) -> None:
+    stdout = io.StringIO()
+    worker = build_outbox_worker(stdout=stdout, clock=FixedClock(NOW))
+
+    worker.sender.send(
+        OutboxMessage(
+            channel=OutboxChannel.EMAIL,
+            recipient="maria@example.com",
+            template="identity.confirmation",
+            payload={"subject": "Επιβεβαίωση", "body": "Γεια σας"},
+        )
+    )
+
+    (email,) = mailoutbox
+    assert (email.to, email.subject, email.body) == (
+        ["maria@example.com"],
+        "Επιβεβαίωση",
+        "Γεια σας",
+    )
+    assert stdout.getvalue() == ""
 
 
 def test_without_stdout_the_console_sender_writes_to_the_process_stdout(

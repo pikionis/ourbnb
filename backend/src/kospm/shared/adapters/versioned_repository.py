@@ -12,7 +12,9 @@ version it loaded and a snapshot of the row values. When the unit commits:
 
 Subclasses set `model`, map rows to aggregates (passing every loaded aggregate through
 `_load(aggregate, row.version)`) and implement `_values()`, the column values of an aggregate
-(everything but `id` and `version`). The domain never sees the version.
+(everything but its id and `version`). The domain never sees the version. The aggregate's id is
+stored in the column `id_field`: the primary key `id` by default, another unique column when the
+table's key belongs to the framework (e.g. `identity.User`).
 """
 
 import abc
@@ -37,6 +39,8 @@ class VersionedDjangoRepository[A: Aggregate[Any]](TrackingRepository[A]):
     """A tracking repository that writes only changed aggregates, and only if nobody else did."""
 
     model: ClassVar[type[models.Model]]
+    # The column that holds the aggregate's id (unique).
+    id_field: ClassVar[str] = "id"
 
     def __init__(self, *, using: str = DEFAULT_DB_ALIAS) -> None:
         super().__init__()
@@ -71,7 +75,7 @@ class VersionedDjangoRepository[A: Aggregate[Any]](TrackingRepository[A]):
         values = self._values(aggregate)
         try:
             with transaction.atomic(using=self.using):  # a savepoint: the unit stays usable
-                self._rows().create(id=aggregate.id, version=0, **values)
+                self._rows().create(**{self.id_field: aggregate.id}, version=0, **values)
         except IntegrityError as error:
             raise self._duplicate(aggregate, error) from error
         self._snapshots[aggregate.id] = _Snapshot(0, values)
@@ -96,7 +100,9 @@ class VersionedDjangoRepository[A: Aggregate[Any]](TrackingRepository[A]):
         """UPDATE the row if it is still at the snapshot's version, else ConcurrencyError."""
         try:
             updated = (
-                self._rows().filter(pk=aggregate.id, version=snapshot.version).update(**columns)
+                self._rows()
+                .filter(**{self.id_field: aggregate.id}, version=snapshot.version)
+                .update(**columns)
             )
         except IntegrityError as error:
             raise self._duplicate(aggregate, error) from error

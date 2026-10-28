@@ -39,6 +39,7 @@ from kospm.properties.domain.errors import (
     PropertyNotReadyForActivation,
     WrongVerificationCode,
 )
+from kospm.properties.domain.events import OwnerEmailChanged
 from kospm.properties.domain.owner import BankAccountStatus
 from kospm.properties.domain.property import PropertyStatus
 from kospm.properties.domain.value_objects import Email, Iban, IcalChannel, PropertyCode
@@ -67,6 +68,7 @@ class Harness:
     def __init__(self) -> None:
         self.uow = FakePropertiesUnitOfWork()
         self.verifier = FakeBankAccountVerifier()
+        self.email_changes: list[OwnerEmailChanged] = []
         self.bus: MessageBus = bootstrap(
             clock=FixedClock(NOW),
             contexts=[
@@ -74,7 +76,10 @@ class Harness:
                     name="properties",
                     uow=self.uow,
                     command_handlers=COMMAND_HANDLERS,
-                    event_handlers=EVENT_HANDLERS,
+                    event_handlers={
+                        **EVENT_HANDLERS,
+                        OwnerEmailChanged: [self.email_changes.append],
+                    },
                     dependencies={
                         "property_defaults": PropertyDefaults(),
                         "bank_verification": BankVerificationPolicy(max_attempts=3),
@@ -201,6 +206,15 @@ class TestOwners:
     def test_unknown_owner(self, harness: Harness) -> None:
         with pytest.raises(OwnerNotFound):
             harness.bus.handle(StartBankAccountVerification(owner_id=new_id()))
+
+    def test_a_new_email_is_announced_to_the_other_contexts(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        harness.bus.handle(
+            UpdateOwnerDetails(owner_id=owner_id, name="Μαρία", email="M.P@example.com", phone="1")
+        )
+        assert harness.email_changes == [
+            OwnerEmailChanged(owner_id=owner_id, email="m.p@example.com")
+        ]
 
 
 class TestBankAccountVerification:

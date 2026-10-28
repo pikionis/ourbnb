@@ -1,0 +1,46 @@
+{% load i18n static %}<!doctype html>
+{% get_current_language as LANGUAGE_CODE %}
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="same-origin">
+  <title>{% block title %}{% endblock %} · {{ portal_name }}</title>
+  <link rel="stylesheet" href="{% static 'portal/portal.css' %}">
+</head>
+<body>
+  <a class="skip-link" href="#content">{% translate "Skip to content" %}</a>
+  <header class="site-header">
+    <a class="brand" href="{{ portal_home }}">{{ portal_name }}</a>
+    <div class="header-actions">
+      <form class="language-toggle" action="{% url 'set_language' %}" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button name="language" value="el" lang="el" {% if LANGUAGE_CODE == "el" %}aria-current="true"{% endif %} aria-label="Ελληνικά">ΕΛ</button>
+        <button name="language" value="en" lang="en" {% if LANGUAGE_CODE == "en" %}aria-current="true"{% endif %} aria-label="English">EN</button>
+      </form>
+      {% if user.is_authenticated %}
+        <form action="{% url 'identity:logout' %}" method="post">
+          {% csrf_token %}
+          <button class="link-button">{% translate "Log out" %}</button>
+        </form>
+      {% endif %}
+    </div>
+  </header>
+
+  <main id="content" class="page">
+    {% if messages %}
+      <ul class="messages">
+        {% for message in messages %}
+          <li class="alert alert-{{ message.tags|default:'info' }}" role="status">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <a href="{% url 'identity:privacy' %}">{% translate "Personal data" %}</a>
+  </footer>
+</body>
+</html>

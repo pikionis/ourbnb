@@ -52,6 +52,18 @@ The onboarding pages are a different kind of UI:
   - The default local-memory cache counts per process.
   - The deploy (Phase 7) configures a shared cache (the database cache) so the limits hold across
     workers.
-- Links in emails are bearer secrets. They work once and expire (configuration). The outbox keeps
-  the email until it is sent, so the database holds a valid link until then; database access is
-  already full access.
+- Links in emails are bearer secrets.
+  - They work once and expire (configuration).
+  - Opening a link changes nothing until the owner presses its button, because mail scanners
+    open links.
+  - The first request moves the token from the URL into the session, as Django's password reset
+    does, so it stays out of later URLs and the Referer header.
+  - The outbox keeps the email, but the admin shows only an email's subject. The database
+    itself holds the link, and database access is already full access.
+- The admin's invitation is sent synchronously through bootstrap as identity's own command,
+  because an event handler's refusal would only be logged (ADR 0014).
+  - The other two integrations are events: `OwnerRegistered` and `OwnerEmailChanged`.
+  - If such a reaction is lost (a crash between commit and handler), identity misses a fact.
+    For example, an account may not know that its owner registered.
+  - The damage is bounded: an invitation can then move that account to another owner, but only
+    through a link sent to the account's own address, and it drops the old password first.

@@ -412,3 +412,235 @@ msgid "Wrong code. %(count)d attempt left."
 msgid_plural "Wrong code. %(count)d attempts left."
 msgstr[0] "Λάθος κωδικός. Απομένει %(count)d προσπάθεια."
 msgstr[1] "Λάθος κωδικός. Απομένουν %(count)d προσπάθειες."
+
+# --- identity: owner accounts and the portal layout (Phase 2b) ---------------------------------
+
+msgid "%(portal)s invites you to its owner portal, where you complete the details of your properties yourself. Choose your password here:"
+msgstr "Σας προσκαλούμε στην πύλη ιδιοκτητών %(portal)s, όπου συμπληρώνετε μόνοι σας τα στοιχεία των ακινήτων σας. Επιλέξτε τον κωδικό σας εδώ:"
+
+msgid "Ask for a new password link"
+msgstr "Ζητήστε σύνδεσμο για νέο κωδικό"
+
+msgid "Back to log in"
+msgstr "Επιστροφή στη σύνδεση"
+
+msgid "By creating an account you confirm that you have read <a href=\"%(privacy_url)s\">how we handle personal data</a>. We never ask for your gov.gr, bank or platform passwords."
+msgstr "Δημιουργώντας λογαριασμό επιβεβαιώνετε ότι διαβάσατε <a href=\"%(privacy_url)s\">πώς χειριζόμαστε τα προσωπικά δεδομένα</a>. Δεν ζητάμε ποτέ τους κωδικούς σας στο gov.gr, στην τράπεζα ή στις πλατφόρμες."
+
+msgid "Can log in"
+msgstr "Μπορεί να συνδεθεί"
+
+msgid "Check your email"
+msgstr "Ελέγξτε το email σας"
+
+msgid "Choose a new password"
+msgstr "Επιλέξτε νέο κωδικό"
+
+msgid "Choose Greek or English."
+msgstr "Επιλέξτε ελληνικά ή αγγλικά."
+
+msgid "Choose your password"
+msgstr "Επιλέξτε τον κωδικό σας"
+
+msgid "Confirm your email address"
+msgstr "Επιβεβαιώστε τη διεύθυνση email σας"
+
+msgid "Confirm your email address first: open the link we emailed you, or ask for a new one below."
+msgstr "Επιβεβαιώστε πρώτα τη διεύθυνση email σας: ανοίξτε τον σύνδεσμο που σας στείλαμε ή ζητήστε νέο παρακάτω."
+
+msgid "Create account"
+msgstr "Δημιουργία λογαριασμού"
+
+msgid "Create an account"
+msgstr "Δημιουργία λογαριασμού"
+
+msgid "Email not confirmed"
+msgstr "Το email δεν έχει επιβεβαιωθεί"
+
+msgid "Enter your email address and we will send you a link to choose a new one."
+msgstr "Γράψτε τη διεύθυνση email σας και θα σας στείλουμε σύνδεσμο για να επιλέξετε νέο κωδικό."
+
+msgid "For the account <strong>%(email)s</strong>."
+msgstr "Για τον λογαριασμό <strong>%(email)s</strong>."
+
+msgid "Forgot your password?"
+msgstr "Ξεχάσατε τον κωδικό σας;"
+
+msgid "Forgot your password? %(url)s"
+msgstr "Ξεχάσατε τον κωδικό σας; %(url)s"
+
+msgid "Hello,"
+msgstr "Γεια σας,"
+
+msgid "I already have an account"
+msgstr "Έχω ήδη λογαριασμό"
+
+msgid "If it was not you, ignore this email."
+msgstr "Αν δεν ήσασταν εσείς, αγνοήστε αυτό το email."
+
+msgid "If this address has an account, we sent it a link to choose a new password. The link works once."
+msgstr "Αν υπάρχει λογαριασμός με αυτή τη διεύθυνση, του στείλαμε σύνδεσμο για να επιλέξετε νέο κωδικό. Ο σύνδεσμος λειτουργεί μία φορά."
+
+msgid "If this address has an account, we sent it a new link."
+msgstr "Αν υπάρχει λογαριασμός με αυτή τη διεύθυνση, του στείλαμε νέο σύνδεσμο."
+
+msgid "If you did not ask for it, ignore this email: your password stays as it is."
+msgstr "Αν δεν το ζητήσατε εσείς, αγνοήστε αυτό το email: ο κωδικός σας μένει όπως είναι."
+
+msgid "If you did not create an account, you can ignore this email."
+msgstr "Αν δεν δημιουργήσατε εσείς λογαριασμό, αγνοήστε αυτό το email."
+
+msgid "Invitation to the owner portal"
+msgstr "Πρόσκληση στην πύλη ιδιοκτητών"
+
+msgid "Invited, no password yet"
+msgstr "Προσκλήθηκε, χωρίς κωδικό ακόμα"
+
+msgid "language"
+msgstr "γλώσσα"
+
+msgid "Log in"
+msgstr "Σύνδεση"
+
+msgid "Log in to the owner portal"
+msgstr "Σύνδεση στην πύλη ιδιοκτητών"
+
+msgid "Log in: %(url)s"
+msgstr "Σύνδεση: %(url)s"
+
+msgid "Log out"
+msgstr "Αποσύνδεση"
+
+msgid "New here?"
+msgstr "Πρώτη φορά εδώ;"
+
+msgid "No confirmation email?"
+msgstr "Δεν ήρθε το email επιβεβαίωσης;"
+
+msgid "Nothing after a few minutes? Look in the spam folder, or send the link again:"
+msgstr "Δεν ήρθε τίποτα σε λίγα λεπτά; Κοιτάξτε στον φάκελο ανεπιθύμητων (spam) ή στείλτε ξανά τον σύνδεσμο:"
+
+msgid "Nothing after a few minutes? Look in the spam folder."
+msgstr "Δεν ήρθε τίποτα σε λίγα λεπτά; Κοιτάξτε στον φάκελο ανεπιθύμητων (spam)."
+
+msgid "Open the link in the email we sent you to confirm your address."
+msgstr "Ανοίξτε τον σύνδεσμο στο email που σας στείλαμε για να επιβεβαιώσετε τη διεύθυνσή σας."
+
+msgid "Our full notice on personal data is being prepared with our lawyer and will be published on this page."
+msgstr "Η πλήρης ενημέρωση για τα προσωπικά δεδομένα ετοιμάζεται με τον δικηγόρο μας και θα δημοσιευτεί σε αυτή τη σελίδα."
+
+msgid "owner registered"
+msgstr "ο ιδιοκτήτης εγγράφηκε"
+
+msgid "Owners who want us to manage their property create an account and fill in their details themselves."
+msgstr "Οι ιδιοκτήτες που θέλουν να διαχειριστούμε το ακίνητό τους δημιουργούν λογαριασμό και συμπληρώνουν μόνοι τους τα στοιχεία τους."
+
+msgid "Password"
+msgstr "Κωδικός"
+
+msgid "Password again"
+msgstr "Ο κωδικός ξανά"
+
+msgid "Personal data"
+msgstr "Προσωπικά δεδομένα"
+
+msgid "Please check the following:"
+msgstr "Ελέγξτε τα παρακάτω:"
+
+msgid "Please confirm your email address to finish creating your account on the %(portal)s owner portal:"
+msgstr "Επιβεβαιώστε τη διεύθυνση email σας για να ολοκληρωθεί η δημιουργία του λογαριασμού σας στην πύλη ιδιοκτητών %(portal)s:"
+
+msgid "portal account"
+msgstr "λογαριασμός πύλης"
+
+msgid "portal account status"
+msgstr "κατάσταση λογαριασμού πύλης"
+
+msgid "Save the password"
+msgstr "Αποθήκευση κωδικού"
+
+msgid "Send the confirmation link again"
+msgstr "Στείλτε ξανά τον σύνδεσμο επιβεβαίωσης"
+
+msgid "Send the link"
+msgstr "Αποστολή συνδέσμου"
+
+msgid "Send the link again"
+msgstr "Νέα αποστολή συνδέσμου"
+
+msgid "Skip to content"
+msgstr "Μετάβαση στο περιεχόμενο"
+
+msgid "Someone, hopefully you, asked for a new password for your account on the %(portal)s owner portal. Choose it here:"
+msgstr "Κάποιος, ελπίζουμε εσείς, ζήτησε νέο κωδικό για τον λογαριασμό σας στην πύλη ιδιοκτητών %(portal)s. Επιλέξτε τον εδώ:"
+
+msgid "Someone, hopefully you, tried to create an account with this email address, but you already have one on the %(portal)s owner portal."
+msgstr "Κάποιος, ελπίζουμε εσείς, προσπάθησε να δημιουργήσει λογαριασμό με αυτή τη διεύθυνση email, αλλά έχετε ήδη λογαριασμό στην πύλη ιδιοκτητών %(portal)s."
+
+msgid "The link works once and expires in %(hours)d hour."
+msgid_plural "The link works once and expires in %(hours)d hours."
+msgstr[0] "Ο σύνδεσμος λειτουργεί μία φορά και λήγει σε %(hours)d ώρα."
+msgstr[1] "Ο σύνδεσμος λειτουργεί μία φορά και λήγει σε %(hours)d ώρες."
+
+msgid "The two passwords are different."
+msgstr "Οι δύο κωδικοί διαφέρουν."
+
+msgid "This link does not work"
+msgstr "Αυτός ο σύνδεσμος δεν λειτουργεί"
+
+msgid "This link has expired or was already used. Ask for a new one."
+msgstr "Ο σύνδεσμος έληξε ή χρησιμοποιήθηκε ήδη. Ζητήστε νέο."
+
+msgid "Too many attempts. Try again in a few minutes."
+msgstr "Πολλές προσπάθειες. Δοκιμάστε ξανά σε λίγα λεπτά."
+
+msgid "Use your email address and a password. We will email you a link to confirm the address."
+msgstr "Χρησιμοποιήστε τη διεύθυνση email σας και έναν κωδικό. Θα σας στείλουμε email με σύνδεσμο για να επιβεβαιώσετε τη διεύθυνση."
+
+msgid "We sent an email to <strong>%(email)s</strong>. Open the link in it to confirm your address."
+msgstr "Στείλαμε email στο <strong>%(email)s</strong>. Ανοίξτε τον σύνδεσμο που περιέχει για να επιβεβαιώσετε τη διεύθυνσή σας."
+
+msgid "We use the details you give us only to manage your properties and to pay you. We never ask for your gov.gr, bank or platform passwords."
+msgstr "Χρησιμοποιούμε τα στοιχεία που μας δίνετε μόνο για να διαχειριζόμαστε τα ακίνητά σας και για να σας πληρώνουμε. Δεν ζητάμε ποτέ τους κωδικούς σας στο gov.gr, στην τράπεζα ή στις πλατφόρμες."
+
+msgid "Wrong email or password."
+msgstr "Λάθος email ή κωδικός."
+
+msgid "You already have an account"
+msgstr "Έχετε ήδη λογαριασμό"
+
+msgid "Your email address is confirmed. You can log in."
+msgstr "Η διεύθυνση email σας επιβεβαιώθηκε. Μπορείτε να συνδεθείτε."
+
+msgid "Your new password is set. You can log in."
+msgstr "Ο νέος σας κωδικός αποθηκεύτηκε. Μπορείτε να συνδεθείτε."
+
+msgid "Your password is set. You can log in."
+msgstr "Ο κωδικός σας αποθηκεύτηκε. Μπορείτε να συνδεθείτε."
+
+msgid "Invite to the owner portal (email)"
+msgstr "Πρόσκληση στην πύλη ιδιοκτητών (email)"
+
+msgid "%(name)s: invitation emailed to %(email)s."
+msgstr "%(name)s: η πρόσκληση στάλθηκε στο %(email)s."
+
+msgid "Owner portal account"
+msgstr "Λογαριασμός στην πύλη ιδιοκτητών"
+
+msgid "%(name)s: no invitation was sent. %(email)s cannot be this owner's login: another login uses it, or it is too long."
+msgstr "%(name)s: δεν στάλθηκε πρόσκληση. Το %(email)s δεν μπορεί να είναι η σύνδεση αυτού του ιδιοκτήτη: το χρησιμοποιεί άλλη σύνδεση ή είναι πολύ μεγάλο."
+
+msgid "Confirm my email address"
+msgstr "Επιβεβαίωση της διεύθυνσής μου"
+
+msgid "Confirm that <strong>%(email)s</strong> is your address, to finish creating your account."
+msgstr "Επιβεβαιώστε ότι το <strong>%(email)s</strong> είναι η διεύθυνσή σας, για να ολοκληρωθεί η δημιουργία του λογαριασμού σας."
+
+msgid "Your account on the owner portal"
+msgstr "Ο λογαριασμός σας στην πύλη ιδιοκτητών"
+
+msgid "%(portal)s invites you to its owner portal, and you already have an account there with this email address."
+msgstr "Σας προσκαλούμε στην πύλη ιδιοκτητών %(portal)s, όπου έχετε ήδη λογαριασμό με αυτή τη διεύθυνση email."
+
+msgid "content"
+msgstr "περιεχόμενο"

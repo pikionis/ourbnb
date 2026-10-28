@@ -8,7 +8,11 @@ from kospm.properties.domain.errors import (
     BankVerificationNotStarted,
     InvalidValue,
 )
-from kospm.properties.domain.events import BankAccountVerified, OwnerRegistered
+from kospm.properties.domain.events import (
+    BankAccountVerified,
+    OwnerEmailChanged,
+    OwnerRegistered,
+)
 from kospm.properties.domain.owner import BankAccountStatus, Owner
 from kospm.properties.domain.value_objects import Afm, Email, Iban
 from kospm.shared.domain import new_id
@@ -82,6 +86,13 @@ class TestDetails:
         subject.confirm_bank_account("123456", POLICY)
         subject.change_iban(Iban(VALID_IBAN.lower()))
         assert subject.bank_account_verified is True
+
+    def test_a_new_email_is_announced_so_an_unused_invitation_follows_it(self) -> None:
+        subject = owner(email="maria@example.com")
+        new = Email("m.p@example.com")
+        subject.update_details(name="Μαρία", email=new, phone="+30 6900000000")
+        subject.update_details(name="Μαρία Π.", email=new, phone="+30 6900000000")
+        assert subject.events == [OwnerEmailChanged(owner_id=subject.id, email="m.p@example.com")]
 
     def test_website_consent_is_requested_once(self) -> None:
         subject = owner()

@@ -67,5 +67,5 @@ def test_verification_codes_have_six_digits() -> None:
 
 
 def test_the_production_bus_handles_the_properties_commands() -> None:
-    (properties,) = default_contexts(SystemClock())
-    assert {RegisterOwner, ActivateProperty} <= set(properties.command_handlers)
+    contexts = {context.name: context for context in default_contexts(SystemClock())}
+    assert {RegisterOwner, ActivateProperty} <= set(contexts["properties"].command_handlers)

@@ -10,8 +10,8 @@ extra dependencies. A handler sees its context's `uow`, the shared `clock` and i
 dependencies, nothing else. All contexts share one bus, which collects events from every
 context's Unit of Work, so an event raised in one context reaches the handlers of the others
 (DOMAIN §4.1). This is the only module allowed to import several contexts (import-linter top
-layer), so translating one context's event into another context's command will live here
-(Phase 3+).
+layer), so translating one context's event into another context's command lives here, e.g.
+properties' OwnerEmailChanged into identity's FollowOwnerEmail (ADR 0014).
 
 Wiring mistakes (an unknown dependency, a command handled twice) fail at startup, not on the
 first message that needs the handler.
@@ -28,16 +28,28 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import time, timedelta
 from decimal import Decimal
+from uuid import UUID
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
+from kospm.identity.adapters.mailer import DjangoAccountMailer
+from kospm.identity.adapters.passwords import DjangoPasswordHasher
+from kospm.identity.adapters.tokens import SignedAccountTokens
+from kospm.identity.adapters.unit_of_work import DjangoIdentityUnitOfWork
+from kospm.identity.domain.commands import FollowOwnerEmail, InviteOwner, NoteOwnerRegistered
+from kospm.identity.domain.policies import LinkLifetimes
+from kospm.identity.service_layer import handlers as identity_handlers
+from kospm.identity.service_layer.ports import AccountTokens
+from kospm.identity.service_layer.unit_of_work import IdentityUnitOfWork
 from kospm.properties.adapters.bank_verification import ManualBankAccountVerifier
 from kospm.properties.adapters.unit_of_work import DjangoPropertiesUnitOfWork
 from kospm.properties.domain.defaults import BankVerificationPolicy, PropertyDefaults
+from kospm.properties.domain.events import OwnerEmailChanged, OwnerRegistered
 from kospm.properties.service_layer import handlers as properties_handlers
+from kospm.shared.adapters.throttle import Throttle, ThrottlePolicy
 from kospm.shared.clock import Clock, SystemClock
-from kospm.shared.domain import Command, DomainEvent, Money
+from kospm.shared.domain import Command, DomainEvent, Money, new_id
 from kospm.shared.messagebus import (
     DEFAULT_EVENT_RETRY_POLICY,
     EventRetryPolicy,
@@ -46,12 +58,14 @@ from kospm.shared.messagebus import (
     qualified_name,
 )
 from kospm.shared.outbox.adapters import (
+    ChannelRouter,
     ConsoleSender,
+    DjangoEmailSender,
     DjangoOutbox,
     DjangoOutboxUnitOfWork,
     TextStream,
 )
-from kospm.shared.outbox.domain import OutboxRetryPolicy
+from kospm.shared.outbox.domain import OutboxChannel, OutboxRetryPolicy
 from kospm.shared.outbox.service_layer.ports import MessageSender
 from kospm.shared.outbox.service_layer.worker import (
     OutboxRunReport,
@@ -188,7 +202,14 @@ def default_contexts(clock: Clock) -> list[ContextWiring]:
             command_handlers=properties_handlers.COMMAND_HANDLERS,
             event_handlers=properties_handlers.EVENT_HANDLERS,
             dependencies=properties_dependencies(),
-        )
+        ),
+        ContextWiring(
+            name="identity",
+            uow=DjangoIdentityUnitOfWork(outbox=DjangoOutbox(clock)),
+            command_handlers=identity_handlers.COMMAND_HANDLERS,
+            event_handlers={**identity_handlers.EVENT_HANDLERS, **IDENTITY_TRANSLATIONS},
+            dependencies=identity_dependencies(clock),
+        ),
     ]
 
 
@@ -227,6 +248,80 @@ def _bank_verification_policy() -> BankVerificationPolicy:
         return BankVerificationPolicy(max_attempts=int(settings.BANK_VERIFICATION_MAX_ATTEMPTS))
     except ValueError as error:
         raise ImproperlyConfigured(f"invalid BANK_VERIFICATION_MAX_ATTEMPTS: {error}") from error
+
+
+# --- Identity (DOMAIN §5 owner portal, ADR 0017) ------------------------------------------------
+
+
+def identity_dependencies(clock: Clock) -> dict[str, object]:
+    """The adapters of the identity handlers, from the settings."""
+    return {
+        "password_hasher": DjangoPasswordHasher(),
+        "account_tokens": account_tokens(clock),
+        "account_mailer": DjangoAccountMailer(
+            base_url=settings.PORTAL_BASE_URL,
+            portal_name=settings.PORTAL_NAME,
+            lifetimes=link_lifetimes(),
+        ),
+    }
+
+
+def link_lifetimes() -> LinkLifetimes:
+    """How long emailed links work (ACCOUNT_*_LINK_HOURS)."""
+    try:
+        return LinkLifetimes(
+            confirmation=timedelta(hours=int(settings.ACCOUNT_CONFIRMATION_LINK_HOURS)),
+            invitation=timedelta(hours=int(settings.ACCOUNT_INVITATION_LINK_HOURS)),
+            password_reset=timedelta(hours=int(settings.ACCOUNT_PASSWORD_RESET_LINK_HOURS)),
+        )
+    except (TypeError, ValueError) as error:
+        raise ImproperlyConfigured(f"invalid ACCOUNT_*_LINK_HOURS: {error}") from error
+
+
+def account_tokens(clock: Clock | None = None) -> AccountTokens:
+    """The tokens of emailed links; pages also check a link with them before showing its form."""
+    return SignedAccountTokens(clock=clock or SystemClock(), lifetimes=link_lifetimes())
+
+
+def portal_throttle(name: str) -> Throttle:
+    """The limit on repeated login, sign-up and reset attempts (PORTAL_THROTTLE_*)."""
+    try:
+        policy = ThrottlePolicy(
+            max_attempts=int(settings.PORTAL_THROTTLE_MAX_ATTEMPTS),
+            window=timedelta(seconds=int(settings.PORTAL_THROTTLE_WINDOW_SECONDS)),
+        )
+    except (TypeError, ValueError) as error:
+        raise ImproperlyConfigured(f"invalid PORTAL_THROTTLE_*: {error}") from error
+    return Throttle(name, policy)
+
+
+def invite_owner_to_portal(*, owner_id: UUID, email: str) -> None:
+    """The admin invites a registered owner (properties) to the owner portal (identity).
+
+    Sent as identity's own command, not as an event, so that a refusal (the address is another
+    login's) reaches the admin instead of being logged and swallowed by the bus (ADR 0014).
+    """
+    get_bus().handle(InviteOwner(account_id=new_id(), owner_id=owner_id, email=email))
+
+
+# Cross-context integration (ADR 0014): events of properties become identity's own commands.
+# Only this module sees both contexts.
+
+
+def note_owner_registered_when_registered(event: OwnerRegistered, uow: IdentityUnitOfWork) -> None:
+    identity_handlers.note_owner_registered(NoteOwnerRegistered(owner_id=event.owner_id), uow)
+
+
+def follow_owner_email_when_changed(event: OwnerEmailChanged, uow: IdentityUnitOfWork) -> None:
+    identity_handlers.follow_owner_email(
+        FollowOwnerEmail(owner_id=event.owner_id, email=event.email), uow
+    )
+
+
+IDENTITY_TRANSLATIONS: dict[type[DomainEvent], list[Callable[..., None]]] = {
+    OwnerRegistered: [note_owner_registered_when_registered],
+    OwnerEmailChanged: [follow_owner_email_when_changed],
+}
 
 
 # One bus per thread: a Unit of Work holds the state of the unit in progress (seen aggregates,
@@ -299,10 +394,16 @@ def build_outbox_worker(
 
 def _outbox_sender(stdout: TextStream | None) -> MessageSender:
     name = settings.OUTBOX_SENDER
-    if name == "console":
-        return ConsoleSender(stdout)
-    # The WhatsApp sender arrives in Phase 6 (ADR 0011).
-    raise ImproperlyConfigured(f"OUTBOX_SENDER={name!r} is not a known sender; use 'console'")
+    if name != "console":
+        # The WhatsApp sender arrives in Phase 6 (ADR 0011).
+        raise ImproperlyConfigured(f"OUTBOX_SENDER={name!r} is not a known sender; use 'console'")
+    return ChannelRouter(
+        {
+            OutboxChannel.WHATSAPP: ConsoleSender(stdout),
+            # Django's EMAIL_BACKEND decides: the console in development, SMTP in production.
+            OutboxChannel.EMAIL: DjangoEmailSender(),
+        }
+    )
 
 
 def _outbox_retry_policy() -> OutboxRetryPolicy:

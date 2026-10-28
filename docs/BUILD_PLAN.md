@@ -150,7 +150,7 @@ Owners register and complete the checklist themselves (DOMAIN §5). Design brief
 - [x] Bank account verification decided with an ADR (0018): the admin's manual test transfer,
       checked by the bank's payee check (VoP); an automatic sender later behind the same port,
       which only enqueues the transfer in the outbox (ADR 0005).
-- [ ] Owner registration and login (email + password via Django auth, email verification, password
+- [x] Owner registration and login (email + password via Django auth, email verification, password
       reset, invitation of owners registered by the admin); an owner account is linked to one
       `Owner`. Emails through the outbox (`DjangoEmailSender`); login, sign-up and reset throttled.
 - [ ] Portal shell (layout, language toggle, owner-scoped access) and the checklist dashboard.

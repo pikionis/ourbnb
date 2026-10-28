@@ -1,0 +1,12 @@
+{% extends "portal/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "This link does not work" %}{% endblock %}
+{% block content %}
+  <h1>{% translate "This link does not work" %}</h1>
+  <p class="lead">{{ message }}</p>
+  <ul class="link-list">
+    <li><a href="{% url 'identity:signup_sent' %}">{% translate "Send the confirmation link again" %}</a></li>
+    <li><a href="{% url 'identity:password_forgot' %}">{% translate "Ask for a new password link" %}</a></li>
+    <li><a href="{% url 'identity:login' %}">{% translate "Log in" %}</a></li>
+  </ul>
+{% endblock %}

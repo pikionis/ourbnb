@@ -1,0 +1,21 @@
+{% extends "portal/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Log in" %}{% endblock %}
+{% block content %}
+  <h1>{% translate "Log in to the owner portal" %}</h1>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "portal/form.html" with form=form %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="button">{% translate "Log in" %}</button>
+  </form>
+  <p class="secondary-links">
+    <a href="{% url 'identity:password_forgot' %}">{% translate "Forgot your password?" %}</a>
+    <a href="{% url 'identity:signup_sent' %}">{% translate "No confirmation email?" %}</a>
+  </p>
+  <section class="card">
+    <h2>{% translate "New here?" %}</h2>
+    <p>{% translate "Owners who want us to manage their property create an account and fill in their details themselves." %}</p>
+    <a class="button button-secondary" href="{% url 'identity:signup' %}">{% translate "Create an account" %}</a>
+  </section>
+{% endblock %}

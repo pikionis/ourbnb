@@ -21,6 +21,14 @@ class BankAccountVerified(DomainEvent):
 
 
 @dataclass(frozen=True, kw_only=True)
+class OwnerEmailChanged(DomainEvent):
+    """The owner's email was corrected: an invitation not used yet follows it (identity)."""
+
+    owner_id: UUID
+    email: str
+
+
+@dataclass(frozen=True, kw_only=True)
 class PropertyProfileCompleted(DomainEvent):
     property_id: UUID
 

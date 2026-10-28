@@ -21,7 +21,7 @@ from django.utils.safestring import SafeString
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 
-from kospm.bootstrap import get_bus, property_defaults
+from kospm.bootstrap import get_bus, invite_owner_to_portal, property_defaults
 from kospm.properties import models
 from kospm.properties.adapters.queries import missing_for_activation, profile_gaps
 from kospm.properties.domain.commands import (
@@ -135,7 +135,7 @@ class OwnerAdmin(CommandModelAdmin[models.Owner]):
     list_display = ("name", "email", "afm", "bank_account_badge", "property_count")
     search_fields = ("name", "email", "afm")
     inlines = (PropertyInline,)
-    actions = ("start_bank_verification",)
+    actions = ("start_bank_verification", "invite_to_portal")
 
     def get_fieldsets(
         self, request: HttpRequest, obj: models.Owner | None = None
@@ -224,6 +224,32 @@ class OwnerAdmin(CommandModelAdmin[models.Owner]):
                 continue
             owner.refresh_from_db()
             self.message_user(request, self._transfer_instructions(owner), messages.SUCCESS)
+
+    @admin.action(description=gettext_lazy("Invite to the owner portal (email)"))
+    def invite_to_portal(self, request: HttpRequest, queryset: QuerySet[models.Owner]) -> None:
+        """The identity context emails the invitation (DOMAIN §5, owner portal); an owner who
+        already logs in gets a reminder to log in instead. Identity's refusal is reported here
+        (a domain error of that context: properties does not know its kinds)."""
+        for owner in queryset:
+            try:
+                invite_owner_to_portal(owner_id=owner.pk, email=owner.email)
+            except (DomainError, ConcurrencyError):
+                self.message_user(
+                    request,
+                    _(
+                        "%(name)s: no invitation was sent. %(email)s cannot be this owner's "
+                        "login: another login uses it, or it is too long."
+                    )
+                    % {"name": owner.name, "email": owner.email},
+                    messages.ERROR,
+                )
+                continue
+            self.message_user(
+                request,
+                _("%(name)s: invitation emailed to %(email)s.")
+                % {"name": owner.name, "email": owner.email},
+                messages.SUCCESS,
+            )
 
     @admin.display(description=gettext_lazy("bank account"))
     def bank_account_badge(self, obj: models.Owner) -> SafeString:

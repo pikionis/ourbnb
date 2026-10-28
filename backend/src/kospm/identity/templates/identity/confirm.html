@@ -1,0 +1,11 @@
+{% extends "portal/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Confirm your email address" %}{% endblock %}
+{% block content %}
+  <h1>{% translate "Confirm your email address" %}</h1>
+  <p class="lead">{% blocktranslate trimmed %}Confirm that <strong>{{ email }}</strong> is your address, to finish creating your account.{% endblocktranslate %}</p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="button">{% translate "Confirm my email address" %}</button>
+  </form>
+{% endblock %}

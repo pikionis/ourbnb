@@ -77,12 +77,38 @@ def _import_fresh(module: str, monkeypatch: pytest.MonkeyPatch) -> ModuleType:
     return imported
 
 
+# Required in production only.
+_PROD_REQUIRED = {
+    "PORTAL_BASE_URL": "https://kospm.example",
+    "EMAIL_URL": "smtp+tls://mailer:not-a-password@smtp.example:587",
+}
+
+
 @pytest.fixture
 def secrets_env(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
-    for name, value in _REQUIRED_SECRETS.items():
+    for name, value in {**_REQUIRED_SECRETS, **_PROD_REQUIRED}.items():
         monkeypatch.setenv(name, value)
     monkeypatch.setenv("DJANGO_ALLOWED_HOSTS", "kospm.example")
     return monkeypatch
+
+
+@pytest.mark.parametrize("missing", sorted(_PROD_REQUIRED))
+def test_prod_needs_the_portal_address_and_an_smtp_server(
+    secrets_env: pytest.MonkeyPatch, missing: str
+) -> None:
+    secrets_env.delenv(missing)
+    with pytest.raises(ImproperlyConfigured, match=missing):
+        _import_fresh("config.settings.prod", secrets_env)
+
+
+def test_prod_sends_email_by_smtp_and_reads_the_visitor_address_behind_caddy(
+    secrets_env: pytest.MonkeyPatch,
+) -> None:
+    prod = _import_fresh("config.settings.prod", secrets_env)
+    assert prod.EMAIL_BACKEND == "django.core.mail.backends.smtp.EmailBackend"
+    assert (prod.EMAIL_HOST, prod.EMAIL_PORT, prod.EMAIL_USE_TLS) == ("smtp.example", 587, True)
+    assert prod.PORTAL_BASE_URL == "https://kospm.example"
+    assert prod.PORTAL_CLIENT_IP_HEADER == "HTTP_X_FORWARDED_FOR"
 
 
 @pytest.mark.parametrize("module", ["config.settings.dev", "config.settings.prod"])

@@ -4,6 +4,8 @@
   transaction, so the message exists only if the business change commits.
 - DjangoOutboxRepository + DjangoOutboxUnitOfWork: what the worker uses to claim and save entries.
 - ConsoleSender: the development MessageSender, which prints instead of sending.
+- DjangoEmailSender: delivers emails through Django's email backend.
+- ChannelRouter: hands each message to the sender of its channel.
 
 Rows and domain objects are mapped by `to_domain` / `from_domain` / `update_from_domain`; the
 ORM model stays free of rules.
@@ -11,17 +13,24 @@ ORM model stays free of rules.
 
 import json
 import sys
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Final, Protocol, Self
 from uuid import UUID
 
+from django.core.mail import EmailMessage
 from django.db import DEFAULT_DB_ALIAS, transaction
 
 from kospm.shared.adapters.django_unit_of_work import DjangoUnitOfWork
 from kospm.shared.clock import Clock
 from kospm.shared.outbox import models
 from kospm.shared.outbox.domain import OutboxChannel, OutboxEntry, OutboxMessage, OutboxStatus
-from kospm.shared.outbox.service_layer.ports import AbstractOutbox, OutboxRepository
+from kospm.shared.outbox.service_layer.ports import (
+    AbstractOutbox,
+    MessageSender,
+    OutboxRepository,
+    SendError,
+)
 from kospm.shared.outbox.service_layer.worker import OutboxUnitOfWork
 
 # The columns a delivery attempt changes; the message itself never changes after enqueue.
@@ -177,3 +186,36 @@ def _encodable(text: str, stream: TextStream) -> str:
     if not encoding:  # e.g. io.StringIO: any text goes
         return text
     return text.encode(encoding, errors="backslashreplace").decode(encoding)
+
+
+class DjangoEmailSender:
+    """MessageSender for email through Django's EMAIL_BACKEND: SMTP in production, the console in
+    development, memory in tests (ADR 0017).
+
+    The message is rendered when it is enqueued: its payload holds the `subject` and the plain
+    text `body`; the sender only delivers them, from DEFAULT_FROM_EMAIL.
+    """
+
+    def send(self, message: OutboxMessage) -> None:
+        subject = message.payload.get("subject")
+        body = message.payload.get("body")
+        if not isinstance(subject, str) or not isinstance(body, str):
+            raise SendError(f"{message.template}: an email needs a text subject and body")
+        try:
+            EmailMessage(subject=subject, body=body, to=[message.recipient]).send()
+        except OSError as error:  # smtplib's errors are OSErrors too
+            # The entry holds the recipient; the error (stored and logged) does not repeat it.
+            raise SendError(f"{message.template}: {error}") from error
+
+
+class ChannelRouter:
+    """MessageSender that hands each message to the sender of its channel."""
+
+    def __init__(self, senders: Mapping[OutboxChannel, MessageSender]) -> None:
+        self._senders = dict(senders)
+
+    def send(self, message: OutboxMessage) -> None:
+        sender = self._senders.get(message.channel)
+        if sender is None:
+            raise SendError(f"no sender delivers {message.channel} messages")
+        sender.send(message)

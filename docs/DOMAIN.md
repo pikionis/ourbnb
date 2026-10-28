@@ -94,8 +94,12 @@ guests       ──EarlyCheckInAgreed / LateCheckOutAgreed────▶ reserv
 reservations ──StayEnded──────────────────────────────────▶ compliance (DeclarationDue), finance (statement ready)
 properties   ──PropertyActivated──────────────────────────▶ reservations (start iCal sync), owner_portal (ask website consent)
 properties   ──PropertyDeactivated/Reactivated/Offboarded─▶ reservations (stop/resume iCal sync), housekeeping (no new cleanings)
-properties   ──OwnerInvitedToPortal───────────────────────▶ identity (create the owner's account, email the invitation)
+properties   ──OwnerRegistered────────────────────────────▶ identity (note it on the account that reserved the owner)
+properties   ──OwnerEmailChanged──────────────────────────▶ identity (an invitation not used yet follows the new address)
 ```
+
+The admin's "invite to the portal" is the one synchronous step between contexts: bootstrap sends
+identity's `InviteOwner` command with the owner's id and email, so a refusal reaches the admin.
 
 Contexts never import each other's domain models. They communicate through events on the message bus
 and through IDs (`property_id`, `reservation_id`). A context may keep its own small copy of data it needs
@@ -208,10 +212,11 @@ Owners complete their checklist themselves on the owner portal.
   - The account reserves the id of the owner it will be linked to. The owner then registers
     (onboarding step 1) with that id and the account's email.
   - One account per owner, and one owner per account.
-- **Invitation.** The admin can invite an owner they registered (`OwnerInvitedToPortal`).
+- **Invitation.** The admin can invite an owner they registered.
   - The emailed link lets the owner choose a password, which also confirms the email.
   - Inviting again while the invitation is open sends a new link.
-  - An owner whose account is already active uses "forgot password" instead.
+  - An owner whose account is already active uses "forgot password" instead (see the details
+    below).
 - **No automatic linking.** Registering with a ΑΦΜ or email that another owner already has is
   refused with "contact us". An account never links itself to an existing owner: knowing someone's
   ΑΦΜ must not give access to their data.
@@ -272,6 +277,19 @@ with `/domain-change` if the business wants otherwise.
   (`KOS-001`). The prefix (`KOS`) and the width are configuration. The next number is one more than
   the highest number in use with that prefix, so a code is never reused.
 - A `CLOSE_MATCH` payee check needs the name the bank returned; the other results take none.
+- Inviting an owner whose account is already active sends no new link: they get an email
+  reminding them to log in, with the "forgot password" link.
+- An invited owner's email may already be used by an account whose own reserved owner never
+  registered (a sign-up that stopped at "contact us").
+  - That account is connected to the invited owner.
+  - Its password is dropped, and the owner chooses a new one through the invitation link.
+    Whoever chose the old password signed up with that address, but is not trusted with the
+    owner's data.
+  - An account whose own owner registered is never moved, and the admin is told so.
+- When the admin corrects an owner's email, an invitation not used yet follows the new address,
+  and the links already sent to the old one stop working.
+- An email link never changes anything when it is only opened: the owner presses a button
+  (mail scanners open links). A login address has at most 150 characters.
 
 ---
 
