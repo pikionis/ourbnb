@@ -18,13 +18,15 @@ from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 from django.shortcuts import resolve_url
+from django.views.decorators.cache import never_cache
 
 type View = Callable[..., HttpResponseBase]
 
 
 def owner_page(view: View) -> View:
     """The view gets `(request, owner_id, ...)`. Anonymous visitors go to the login page; a
-    staff login is refused (403)."""
+    staff login is refused (403). Pages and files are never cached, so a shared phone's
+    browser keeps no IBAN or key-box photo after logout."""
 
     @functools.wraps(view)
     def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
@@ -33,7 +35,7 @@ def owner_page(view: View) -> View:
             raise PermissionDenied("the owner portal is for owners' logins")
         return view(request, owner_id, *args, **kwargs)
 
-    return login_required(wrapper)
+    return login_required(never_cache(wrapper))
 
 
 def current_owner_id(request: HttpRequest) -> UUID | None:

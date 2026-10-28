@@ -7,6 +7,7 @@ refuses a property that is no longer being set up. Key-box codes and pasted list
 kept out of error reports.
 """
 
+import copy
 from collections.abc import Iterable
 from dataclasses import replace
 from pathlib import PurePosixPath
@@ -20,7 +21,7 @@ from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.translation import gettext as _
-from django.views.decorators.debug import sensitive_post_parameters
+from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
 
 from kospm.bootstrap import (
     get_bus,
@@ -44,7 +45,7 @@ from kospm.properties.domain.commands import (
 )
 from kospm.properties.domain.errors import InvalidValue, ListingNotRead
 from kospm.properties.domain.listing import ListingDraft, ListingTextPolicy
-from kospm.properties.domain.property import Property, PropertyStatus
+from kospm.properties.domain.property import Property
 from kospm.properties.entrypoints.portal.forms import (
     ContractUploadForm,
     ListingTextForm,
@@ -116,7 +117,7 @@ def property_profile(request: HttpRequest, owner_id: UUID, code: str) -> HttpRes
         request.FILES or None,
         initial=ProfileForm.initial_from(prop, owned.version),
     )
-    if request.method == "POST" and _editable(prop) and form.is_valid():
+    if request.method == "POST" and prop.owner_may_change and form.is_valid():
         uploads = {name: form.cleaned_data.get(name) for name in PHOTOS}
         previewed = _profile_command(owner_id, prop, form, _preview_names(prop, uploads))
         if _previewed(prop, previewed, form):
@@ -141,7 +142,7 @@ def property_listing(request: HttpRequest, owner_id: UUID, code: str) -> HttpRes
     prop = owned.prop
     policy = listing_text_policy()
     form = ListingTextForm(request.POST or None, max_characters=policy.max_characters)
-    if request.method == "POST" and _editable(prop) and form.is_valid():
+    if request.method == "POST" and prop.owner_may_change and form.is_valid():
         draft = _read_listing(owner_id, form, policy)
         if draft is not None:
             initial, to_check = fill_from_listing(
@@ -167,7 +168,7 @@ def property_contract(request: HttpRequest, owner_id: UUID, code: str) -> HttpRe
     form = ContractUploadForm(
         request.POST or None, request.FILES or None, initial={"version": owned.version}
     )
-    if request.method == "POST" and _editable(prop) and form.is_valid():
+    if request.method == "POST" and prop.owner_may_change and form.is_valid():
         upload: UploadedFile = form.cleaned_data["signed_contract"]
         command = SignContract(
             property_id=prop.id,
@@ -192,7 +193,7 @@ def property_sublease(request: HttpRequest, owner_id: UUID, code: str) -> HttpRe
         request.POST or None,
         initial={"number": prop.sublease_declaration_number, "version": owned.version},
     )
-    if request.method == "POST" and _editable(prop) and form.is_valid():
+    if request.method == "POST" and prop.owner_may_change and form.is_valid():
         command = RecordSubleaseDeclaration(
             property_id=prop.id,
             number=form.cleaned_data["number"],
@@ -228,10 +229,6 @@ def _owned(owner_id: UUID, code: str) -> OwnerProperty:
     return owned
 
 
-def _editable(prop: Property) -> bool:
-    return prop.status is PropertyStatus.ONBOARDING
-
-
 def _frame(owned: OwnerProperty) -> dict[str, object]:
     """What every property page shows: the property and whether the owner may change it."""
     prop = owned.prop
@@ -239,7 +236,7 @@ def _frame(owned: OwnerProperty) -> dict[str, object]:
         "owned": owned,
         "prop": prop,
         "status": PropertyStatusChoices(prop.status.value).label,
-        "editable": _editable(prop),
+        "editable": prop.owner_may_change,
     }
 
 
@@ -290,6 +287,7 @@ def _checklist(owned: OwnerProperty) -> list[dict[str, object]]:
     ]
 
 
+@sensitive_variables("data")  # the key-box codes
 def _profile_command(
     owner_id: UUID, prop: Property, form: ProfileForm, photos: dict[str, str]
 ) -> UpdatePropertyProfile:
@@ -299,7 +297,7 @@ def _profile_command(
     included, not_included = form.amenities()
     return UpdatePropertyProfile(
         property_id=prop.id,
-        name=prop.name,
+        name=data["name"],
         address=data["address"],
         lat=lat,
         lng=lng,
@@ -309,7 +307,7 @@ def _profile_command(
         exterior_photo=photos["exterior_photo"],
         lockbox_photo=photos["lockbox_photo"],
         guest_lockbox_code=data.get("guest_lockbox_code") or None,
-        cleaner_lockbox_code=data.get("cleaner_lockbox_code") or None,
+        cleaner_lockbox_code=form.new_cleaner_code(),
         amenities_included=included,
         amenities_not_included=not_included,
         ical_feeds=tuple((feed.channel.value, feed.url) for feed in prop.ical_feeds),
@@ -359,9 +357,18 @@ def _photo_names(prop: Property, new: dict[str, str]) -> dict[str, str]:
 
 
 def _previewed(prop: Property, command: PropertyEdit, form: forms.Form) -> bool:
-    """Apply the command to the unsaved copy: the domain's refusal becomes a form error."""
+    """Apply the command to a copy of the property: the domain's refusal becomes a form error.
+
+    A copy, because the page shows `prop` afterwards: a save refused later (e.g. by a change in
+    the meantime) must not show the previewed upload as saved.
+    """
     try:
-        apply_edit(prop, command, property_defaults=property_defaults(), now=SystemClock().now())
+        apply_edit(
+            copy.deepcopy(prop),
+            command,
+            property_defaults=property_defaults(),
+            now=SystemClock().now(),
+        )
     except InvalidValue as error:
         form.add_error(_field(form, error.field), describe(error))
     except DomainError as error:

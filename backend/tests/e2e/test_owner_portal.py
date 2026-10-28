@@ -12,6 +12,7 @@ from kospm.identity.models import User
 from kospm.properties import models
 from tests.e2e.owners import (
     MARIA,
+    add_property_in_admin,
     logged_in_owner,
     messages_of,
     owner_form,
@@ -65,6 +66,11 @@ class TestAccess:
         response = client.get(DASHBOARD)
         assert response.status_code == 302
         assert response["Location"].startswith(reverse("identity:login"))
+
+    def test_owner_pages_are_not_kept_in_the_browsers_cache(self) -> None:
+        client, _ = registered_owner()
+        for url in (DASHBOARD, DETAILS, BANK):
+            assert "no-store" in client.get(url)["Cache-Control"]
 
     def test_a_staff_login_is_not_an_owner(self, admin_client: Client) -> None:
         assert admin_client.get(DASHBOARD).status_code == 403
@@ -251,10 +257,7 @@ class TestOwnData:
         other = register_owner_in_admin(
             admin_client, email="nikos@example.com", afm=OTHER_VALID_AFM
         )
-        admin_client.post(
-            reverse("admin:properties_property_add"),
-            {"owner": str(other.pk), "code": "KOS-N1", "name": "Σπίτι του Νίκου"},
-        )
+        add_property_in_admin(admin_client, other, code="KOS-N1", name="Σπίτι του Νίκου")
         client, _ = registered_owner()
         page = client.get(DASHBOARD).content.decode()
         assert "KOS-N1" not in page

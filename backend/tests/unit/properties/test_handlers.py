@@ -619,6 +619,64 @@ class TestOwnerPortalProperties:
             NOW,
         )
 
+    def test_an_owner_signs_only_their_own_property_while_it_is_set_up(
+        self, harness: Harness
+    ) -> None:
+        owner_id = harness.register_owner()
+        nikos = harness.register_owner(afm=OTHER_VALID_AFM, email="nikos@example.com")
+        property_id = self.add_property(harness, owner_id)
+        harness.bus.handle(OfferContract(property_id=property_id, document="contracts/d.pdf"))
+
+        def signed_by(acting_owner_id: UUID) -> SignContract:
+            return SignContract(
+                property_id=property_id, document="contracts/s.pdf", acting_owner_id=acting_owner_id
+            )
+
+        with pytest.raises(PropertyNotFound):
+            harness.bus.handle(signed_by(nikos))
+        harness.bus.handle(OffboardProperty(property_id=property_id))
+        with pytest.raises(ChangeThroughTheIke):
+            harness.bus.handle(signed_by(owner_id))
+        assert harness.property(property_id).contract is None
+
+    def test_an_owner_never_replaces_a_recorded_contract(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        property_id = self.add_property(harness, owner_id)
+        harness.bus.handle(OfferContract(property_id=property_id, document="contracts/d.pdf"))
+        harness.bus.handle(  # the IKE records a contract signed on paper, with its own terms
+            SignContract(
+                property_id=property_id,
+                document="contracts/paper.pdf",
+                commission_rate=Decimal("0.12"),
+                acting_owner_id=None,
+            )
+        )
+        with pytest.raises(ChangeThroughTheIke):
+            harness.bus.handle(
+                SignContract(
+                    property_id=property_id, document="contracts/s.pdf", acting_owner_id=owner_id
+                )
+            )
+        assert harness.property(property_id).contract.commission_rate == Decimal("0.12")
+
+    def test_a_code_taken_in_the_meantime_is_skipped(
+        self, harness: Harness, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        owner_id = harness.register_owner()
+        harness.create_property(owner_id, code="KOS-001")  # added by someone else meanwhile
+        real = harness.uow.properties.codes_with_prefix
+        reads: list[str] = []
+
+        def stale_first(prefix: str) -> list[PropertyCode]:
+            reads.append(prefix)
+            return [] if len(reads) == 1 else real(prefix)
+
+        monkeypatch.setattr(harness.uow.properties, "codes_with_prefix", stale_first)
+
+        property_id = self.add_property(harness, owner_id)
+
+        assert harness.property(property_id).code == PropertyCode("KOS-002")
+
     def test_no_signed_contract_before_the_ike_offers_one(self, harness: Harness) -> None:
         owner_id = harness.register_owner()
         property_id = self.add_property(harness, owner_id)

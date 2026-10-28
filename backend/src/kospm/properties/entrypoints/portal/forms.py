@@ -20,7 +20,7 @@ from django_stubs_ext import StrOrPromise
 
 from kospm.properties import models
 from kospm.properties.domain.errors import InvalidValue
-from kospm.properties.domain.listing import ListingDraft, ListingText
+from kospm.properties.domain.listing import ListingDraft, ListingText, ProfileFields
 from kospm.properties.domain.property import Property
 from kospm.properties.domain.value_objects import AccountHolderName, Afm, Iban
 from kospm.properties.entrypoints.texts import describe
@@ -143,6 +143,7 @@ class _UploadsForm(forms.Form):
 class ProfileForm(_UploadsForm):
     """The property's profile and check-in guide (onboarding step 2)."""
 
+    name = _text(_("Name of the property"), max_length=200)
     address = _text(_("Address"), max_length=300, autocomplete="street-address")
     coordinates = forms.CharField(
         label=_("Coordinates"),
@@ -189,6 +190,9 @@ class ProfileForm(_UploadsForm):
         max_length=32,
         widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "off"}),
     )
+    cleaners_use_guest_code = forms.BooleanField(
+        label=_("Cleaners use the guests' code again"), required=False
+    )
     other_included = forms.CharField(
         label=_("Other amenities the house has (one per line)"),
         required=False,
@@ -220,6 +224,7 @@ class ProfileForm(_UploadsForm):
         guide, amenities = prop.check_in_guide, prop.amenities
         location = prop.location
         initial: dict[str, Any] = {
+            "name": prop.name,
             "address": prop.address,
             "coordinates": f"{location.lat}, {location.lng}" if location is not None else "",
             "map_url": guide.map_url,
@@ -256,11 +261,27 @@ class ProfileForm(_UploadsForm):
         )
         return lat, lng
 
+    def clean(self) -> dict[str, Any]:
+        data = super().clean() or {}
+        if data.get("cleaners_use_guest_code") and data.get("cleaner_lockbox_code"):
+            self.add_error(
+                "cleaner_lockbox_code",
+                _("Enter a new code or tick “cleaners use the guests' code again”, not both."),
+            )
+        return data
+
     def clean_exterior_photo(self) -> UploadedFile | None:
         return self._small_enough("exterior_photo")
 
     def clean_lockbox_photo(self) -> UploadedFile | None:
         return self._small_enough("lockbox_photo")
+
+    def new_cleaner_code(self) -> str | None:
+        """The cleaners' code to save: "" for the guests' code again, None to keep the saved one."""
+        data = self.cleaned_data
+        if data.get("cleaners_use_guest_code"):
+            return ""
+        return data.get("cleaner_lockbox_code") or None
 
     def amenities(self) -> tuple[tuple[str, ...], tuple[str, ...]]:
         """What the house has and has not, as the domain stores them."""
@@ -291,48 +312,59 @@ class ListingTextForm(forms.Form):
         return _checked(lambda: ListingText(self.cleaned_data["text"]).value)
 
 
-_FROM_LISTING = ("address", "directions_el", "directions_en")
-_OTHER_AMENITIES = {"yes": "other_included", "no": "other_not_included"}
-
-
 def fill_from_listing(
     initial: Mapping[str, Any], draft: ListingDraft
 ) -> tuple[dict[str, Any], set[str]]:
-    """The profile form's values with its gaps filled in from the draft (design brief J6).
+    """The profile form's values with their gaps filled in from the draft (design brief J6).
 
-    What the owner entered stays as it is. Returns the names of the fields the draft filled in,
-    which the page marks "check this". A draft has no key-box code or photo to fill in.
+    The domain decides what is filled in (`ListingDraft.fill_gaps`): this maps the form's values
+    to the profile and back, and names the fields that the page marks "check this". A draft has
+    no key-box code or photo to fill in.
     """
-    filled, to_check = dict(initial), set[str]()
-    for name in _FROM_LISTING:
-        value = getattr(draft, name)
-        if value and not filled.get(name):
-            filled[name] = value
-            to_check.add(name)
-    standard = {_amenity_key(name): amenity_field(name) for name in STANDARD_AMENITIES}
-    others = {field: _lines(str(filled.get(field) or "")) for field in _OTHER_AMENITIES.values()}
-    known = {_amenity_key(item) for lines in others.values() for item in lines}
-    for answer, items in (
-        ("yes", draft.amenities_included),
-        ("no", draft.amenities_not_included),
-    ):
-        for item in items:
-            key = _amenity_key(item)
-            if key in standard:
-                if not filled.get(standard[key]):
-                    filled[standard[key]] = answer
-                    to_check.add(standard[key])
-            elif key and key not in known:
-                others[_OTHER_AMENITIES[answer]].append(item)
-                known.add(key)
-                to_check.add(_OTHER_AMENITIES[answer])
-    filled.update({field: "\n".join(lines) for field, lines in others.items()})
-    return filled, to_check
+    answers = {name: initial.get(amenity_field(name)) for name in STANDARD_AMENITIES}
+    filled = draft.fill_gaps(
+        ProfileFields(
+            address=str(initial.get("address") or ""),
+            directions_el=str(initial.get("directions_el") or ""),
+            directions_en=str(initial.get("directions_en") or ""),
+            amenities_included=(
+                *(name for name, answer in answers.items() if answer == "yes"),
+                *_lines(str(initial.get("other_included") or "")),
+            ),
+            amenities_not_included=(
+                *(name for name, answer in answers.items() if answer == "no"),
+                *_lines(str(initial.get("other_not_included") or "")),
+            ),
+        )
+    )
+    profile = filled.fields
+    values = {
+        **initial,
+        "address": profile.address,
+        "directions_el": profile.directions_el,
+        "directions_en": profile.directions_en,
+        "other_included": "\n".join(_others(profile.amenities_included)),
+        "other_not_included": "\n".join(_others(profile.amenities_not_included)),
+    }
+    for name in STANDARD_AMENITIES:
+        if name in profile.amenities_included:
+            values[amenity_field(name)] = "yes"
+        elif name in profile.amenities_not_included:
+            values[amenity_field(name)] = "no"
+    to_check = set(filled.texts)
+    for name in filled.amenities:
+        if name in STANDARD_AMENITIES:
+            to_check.add(amenity_field(name))
+        elif name in profile.amenities_included:
+            to_check.add("other_included")
+        else:
+            to_check.add("other_not_included")
+    return values, to_check
 
 
-def _amenity_key(name: str) -> str:
-    """Wi-Fi, WiFi and wifi are one amenity: letters and digits only, of any script and case."""
-    return re.sub(r"[\W_]+", "", name.casefold())
+def _others(amenities: tuple[str, ...]) -> list[str]:
+    """The amenities that are not asked about as Yes / No: the form's free-text lists."""
+    return [item for item in amenities if item not in STANDARD_AMENITIES]
 
 
 class ContractUploadForm(_UploadsForm):

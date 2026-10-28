@@ -7,8 +7,8 @@
   {% if prop.contract %}
     <p class="alert alert-success">✓ {% translate "The signed contract is uploaded." %}
       <a href="{% url 'portal:property_file' prop.code.value 'contract_document' %}">{% translate "Download it" %}</a></p>
-  {% endif %}
-  {% if prop.contract_draft %}
+    {% for error in form.non_field_errors %}<p class="alert alert-error" role="alert">{{ error }}</p>{% endfor %}
+  {% elif prop.contract_draft %}
     <ol class="steps">
       <li><a href="{% url 'portal:property_file' prop.code.value 'contract_draft_document' %}">{% translate "Download the contract (PDF)" %}</a></li>
       <li>{% translate "Sign it digitally, e.g. on gov.gr, with your own credentials. We never ask for your passwords." %}</li>
@@ -21,7 +21,7 @@
         <button type="submit" class="button">{% translate "Upload" %}</button>
       </form>
     {% endif %}
-  {% elif not prop.contract %}
+  {% else %}
     <p class="lead">{% translate "We are preparing your contract. You will find it here." %}</p>
   {% endif %}
 {% endblock %}

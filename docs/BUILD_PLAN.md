@@ -286,7 +286,15 @@ shows everything.
       and ports so the existing app on the VPS is not affected.
 - [ ] `deploy/backup.sh`: nightly `pg_dump`, encrypted, uploaded off-site (S3-compatible, e.g.
       Backblaze B2); keep 30 daily / 12 monthly; documented restore test.
-- [ ] Health endpoint, structured logging, error reporting (Sentry free tier, optional).
+- [ ] Owners' uploads (photos, contracts; from the Phase 2b review): the admin opens them through
+      a staff-only view (media is never served publicly); they are backed up with the database,
+      not only `pg_dump`; replaced files are deleted on a schedule (retention of replaced signed
+      contracts decided with Petros).
+- [ ] Request limits: Caddy `request_body max_size` above `PORTAL_UPLOAD_MAX_MB`; the gunicorn
+      timeout longer than twice `LISTING_EXTRACTOR_TIMEOUT_SECONDS` (ADR 0019).
+- [ ] Health endpoint, structured logging, error reporting (Sentry free tier, optional). If Sentry
+      is used: scrub key-box codes, IBANs and pasted listing text, and send no local variables or
+      request bodies.
 - [ ] `docs/RUNBOOK.md`: deploy, rollback, restore, rotate secrets, add a property, add a team member.
 - [ ] Production smoke test: real iCal of one property, plan tomorrow, receive WhatsApp on test phone.
 

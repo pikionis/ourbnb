@@ -93,6 +93,17 @@ class TestContractToSign:
         )
         assert prop.events == [ContractSigned(property_id=prop.id)]
 
+    def test_a_recorded_contract_is_changed_through_the_ike(self) -> None:
+        # E.g. signed on paper with its own terms: an owner's upload of the draft never
+        # replaces it, nor its terms.
+        prop = ready_property()
+        recorded = prop.contract
+        prop.offer_contract(draft())
+        with pytest.raises(ChangeThroughTheIke) as refused:
+            prop.sign_offered_contract("contracts/again.pdf", signed_at=SIGNED_AT)
+        assert refused.value.item == "contract"
+        assert prop.contract == recorded
+
     def test_nothing_to_sign_before_a_draft_exists(self) -> None:
         with pytest.raises(NoContractToSign):
             new_property().sign_offered_contract("contracts/x.pdf", signed_at=SIGNED_AT)
@@ -111,6 +122,12 @@ class TestContractToSign:
 
 
 class TestWhatTheOwnerMayChange:
+    def test_only_while_it_is_being_set_up(self) -> None:
+        prop = ready_property()
+        assert prop.owner_may_change is True
+        prop.activate(owner_bank_account_verified=True)
+        assert prop.owner_may_change is False
+
     def test_their_own_property_while_it_is_being_set_up(self) -> None:
         owner_id = new_id()
         new_property(owner_id=owner_id).check_owner_may_change(owner_id)

@@ -27,6 +27,7 @@
       </div>
     {% endif %}
     {{ form.version }}
+    {% include "portal/_field.html" with field=form.name %}
 
     <h2>{% translate "Where it is" %}</h2>
     {% include "portal/_field.html" with field=form.address %}
@@ -38,15 +39,21 @@
     {% include "portal/_field.html" with field=form.directions_en %}
     {% include "portal/_field.html" with field=form.exterior_photo %}
     {% if prop.check_in_guide.exterior_photo %}
-      <p class="fine-print">✓ {% translate "A photo is saved." %} <a href="{% url 'portal:property_file' prop.code.value 'exterior_photo' %}">{% translate "Open it" %}</a></p>
+      {% url 'portal:property_file' prop.code.value 'exterior_photo' as exterior_url %}
+      <p class="fine-print"><a href="{{ exterior_url }}"><img class="thumb" src="{{ exterior_url }}" alt="{% translate 'Photo of the outside' %}"></a>✓ {% translate "A photo is saved." %} <a href="{{ exterior_url }}">{% translate "Open it" %}</a></p>
     {% endif %}
     {% include "portal/_field.html" with field=form.lockbox_photo %}
     {% if prop.check_in_guide.lockbox_photo %}
-      <p class="fine-print">✓ {% translate "A photo is saved." %} <a href="{% url 'portal:property_file' prop.code.value 'lockbox_photo' %}">{% translate "Open it" %}</a></p>
+      {% url 'portal:property_file' prop.code.value 'lockbox_photo' as lockbox_url %}
+      <p class="fine-print"><a href="{{ lockbox_url }}"><img class="thumb" src="{{ lockbox_url }}" alt="{% translate 'Photo of the key box' %}"></a>✓ {% translate "A photo is saved." %} <a href="{{ lockbox_url }}">{% translate "Open it" %}</a></p>
     {% endif %}
     {% include "portal/_field.html" with field=form.guest_lockbox_code %}
     {% if prop.check_in_guide.guest_lockbox_code %}<p class="fine-print">✓ {% translate "A code is saved." %}</p>{% endif %}
     {% include "portal/_field.html" with field=form.cleaner_lockbox_code %}
+    {% if prop.check_in_guide.cleaner_lockbox_code %}
+      <p class="fine-print">✓ {% translate "A code is saved." %}</p>
+      <div class="field"><label class="choice">{{ form.cleaners_use_guest_code }} {{ form.cleaners_use_guest_code.label }}</label></div>
+    {% endif %}
 
     <h2>{% translate "Amenities" %}</h2>
     <p class="help">{% translate "The guests' assistant answers from this list. Leave unknown items empty." %}</p>

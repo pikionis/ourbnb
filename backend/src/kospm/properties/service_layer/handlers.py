@@ -195,7 +195,22 @@ def create_property(
     property_codes: PropertyCodeSeries,
 ) -> None:
     """A new property of an owner. Without a code (the owner portal), it gets the next code of
-    the series (DOMAIN §5, owner portal)."""
+    the series (DOMAIN §5, owner portal); if another owner took that code in the meantime, the
+    property gets the code after it."""
+    try:
+        _add_property(cmd, uow, property_defaults, property_codes)
+    except PropertyCodeTaken:
+        if cmd.code is not None:
+            raise
+        _add_property(cmd, uow, property_defaults, property_codes)
+
+
+def _add_property(
+    cmd: CreateProperty,
+    uow: PropertiesUnitOfWork,
+    property_defaults: PropertyDefaults,
+    property_codes: PropertyCodeSeries,
+) -> None:
     with uow:
         _owner(uow, cmd.owner_id, cmd.acting_owner_id)  # must exist; read only, not written
         if cmd.code is None:

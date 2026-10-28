@@ -211,6 +211,15 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "Only adapters and bootstrap talk to the Claude API"
+type = "forbidden"
+# Pages and models reach Claude through a port (ListingTextExtractor) that bootstrap wires: the
+# indirect import through bootstrap is expected, a direct one is not.
+source_modules = ["kospm.**.entrypoints", "kospm.**.models", "kospm.shared"]
+forbidden_modules = ["anthropic"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
 name = "Service layer never touches Django, the ORM or adapters"
 type = "forbidden"
 # The shared bus, Unit of Work and Clock are service-layer machinery: pure Python as well.

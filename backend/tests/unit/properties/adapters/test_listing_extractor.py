@@ -127,6 +127,49 @@ def test_an_api_failure_is_not_read() -> None:
         extractor.extract(LISTING)
 
 
+def test_any_failure_of_the_sdk_is_not_read() -> None:
+    extractor, _ = extractor_answering(anthropic.AnthropicError("the SDK refused the request"))
+    with pytest.raises(ListingNotRead):
+        extractor.extract(LISTING)
+
+
+def test_the_request_fits_the_real_sdk() -> None:
+    """The real SDK builds the HTTP request; a mock transport answers, so no network."""
+    sent: list[httpx2.Request] = []
+
+    def api(request: httpx2.Request) -> httpx2.Response:
+        sent.append(request)
+        return httpx2.Response(
+            200,
+            json={
+                "id": "msg_test",
+                "type": "message",
+                "role": "assistant",
+                "model": "claude-opus-5-5",
+                "content": [{"type": "text", "text": json.dumps(DRAFT)}],
+                "stop_reason": "end_turn",
+                "stop_sequence": None,
+                "usage": {"input_tokens": 120, "output_tokens": 80},
+            },
+        )
+
+    client = anthropic.Anthropic(
+        api_key="sk-ant-test-not-a-key",
+        max_retries=0,
+        http_client=httpx2.Client(transport=httpx2.MockTransport(api)),
+    )
+    extractor = ClaudeListingExtractor(client=client, model="claude-opus-5-5", effort="low")
+
+    assert extractor.extract(LISTING).address == DRAFT["address"]
+    (request,) = sent
+    body = json.loads(request.content)
+    assert request.url.path == "/v1/messages"
+    assert "server-side-fallback-2026-07-01" in request.headers["anthropic-beta"]
+    assert (body["model"], body["fallbacks"]) == ("claude-opus-5-5", "default")
+    assert body["output_config"]["format"]["type"] == "json_schema"
+    assert "tools" not in body
+
+
 def test_without_an_api_key_the_assistant_is_unavailable() -> None:
     with pytest.raises(ListingNotRead):
         UnavailableListingExtractor().extract(LISTING)

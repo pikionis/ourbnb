@@ -180,7 +180,13 @@ class Property(Aggregate[UUID]):
             self.events.append(ContractOffered(property_id=self.id))
 
     def sign_offered_contract(self, document: str, *, signed_at: datetime) -> None:
-        """The owner uploads the draft, signed by them: the contract has the draft's terms."""
+        """The owner uploads the draft, signed by them: the contract has the draft's terms.
+
+        Once a contract is recorded (by the owner, or by the IKE, e.g. signed on paper with its
+        own terms), it changes through the IKE: an upload never replaces it, nor its terms.
+        """
+        if self.contract is not None:
+            raise ChangeThroughTheIke("contract")
         if self.contract_draft is None:
             raise NoContractToSign("the IKE has not offered a contract for this property yet")
         self.sign_contract(
@@ -266,13 +272,18 @@ class Property(Aggregate[UUID]):
 
     # --- the owner portal ----------------------------------------------------------------------
 
+    @property
+    def owner_may_change(self) -> bool:
+        """The owner changes the property in the portal only while it is being set up (DOMAIN
+        §5, owner portal); after that, changes go through the IKE."""
+        return self.status is PropertyStatus.ONBOARDING
+
     def check_owner_may_change(self, owner_id: UUID) -> None:
-        """An owner changes only their own property, and only while it is being set up
-        (DOMAIN §5, owner portal); after that, changes go through the IKE. Another owner's
-        property is "not found", so the portal never tells that it exists."""
+        """An owner changes only their own property, and only while `owner_may_change`.
+        Another owner's property is "not found", so the portal never tells that it exists."""
         if owner_id != self.owner_id:
             raise PropertyNotFound(f"no property has id {self.id}")
-        if self.status is not PropertyStatus.ONBOARDING:
+        if not self.owner_may_change:
             raise ChangeThroughTheIke("property")
 
     def _refuse_if_offboarded(self, action: str) -> None:

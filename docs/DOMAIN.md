@@ -233,7 +233,7 @@ Owners complete their checklist themselves on the owner portal.
   prefix and the next number (e.g. `KOS-014`).
 - **Listing text.** Listing text pasted by the owner may be read by the AI into a draft of the
   profile (§2.4). The owner reviews it before anything is saved. The AI never fills in lockbox
-  codes, and no URL is fetched (§2.1).
+  codes, and no URL is fetched (§2.1). The text goes to the Claude API (ADR 0019).
 - **Files.** Uploaded files (photos, contracts) are visible only to their owner and the admin.
 
 ### Value objects
@@ -293,6 +293,11 @@ with `/domain-change` if the business wants otherwise.
 - The owner starts the bank-account verification in the portal only for an unverified account.
   A verification under way is restarted by the IKE only, because a restart cancels the
   transfer that may have been sent.
+- The owner uploads the signed contract once. A contract already recorded (by the owner, or by
+  the IKE, e.g. signed on paper with its own terms) changes through the IKE: an upload never
+  replaces it, nor its terms.
+- When another owner takes the next property code at the same moment, the property gets the code
+  after it.
 - Listing text:
   - The text is at most 20,000 characters, and an owner may have it read 10 times an hour. Both
     limits are configuration, for cost.
@@ -300,7 +305,7 @@ with `/domain-change` if the business wants otherwise.
     stays as it is.
   - An amenity is matched to the standard Yes/No list ignoring case, spaces and hyphens
     ("WiFi" is "Wi-Fi"); any other amenity is added to the free-text lists.
-  - An amenity the draft gives both ways is left for the owner to answer.
+  - An amenity the draft gives both ways, however written, is left for the owner to answer.
 
 ---
 
@@ -578,7 +583,13 @@ properties, owners with `show_on_website = True` (name/logo), testimonials, mana
 - ΑΜΑ under the sublease model: always a new ΑΜΑ in the IKE's name, or can an owner's existing ΑΜΑ
   be used? — accountant/lawyer.
 - One contract per owner or one per property? — lawyer.
-- Privacy notice for owner accounts (GDPR Art. 13) — lawyer.
+- Privacy notice for owner accounts (GDPR Art. 13) — lawyer. It must name Anthropic, which
+  reads the listing text owners paste (ADR 0019).
+- May an owner upload a new signed contract, e.g. for a renegotiated draft? Today a recorded
+  contract changes through the IKE.
+- Should a profile be refused when its directions contain the stored lockbox code? The guests'
+  assistant may answer from the directions (§7), so a code there would bypass the code rule.
+- A limit on listing readings for the whole platform per hour (cost), besides the one per owner?
 - Bank payee check `NOT_POSSIBLE`: today it always means the test transfer was sent. Should
   the admin be able to record "not possible, not sent", and what happens to the account then?
 - May payouts go to an account whose holder is not the owner (a spouse, a company)? Today the

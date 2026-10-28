@@ -252,6 +252,7 @@ input[type="file"] { width: 100%; padding: 0.5rem 0; font: inherit; }
   font-weight: 700;
   white-space: nowrap;
 }
+.thumb { display: block; max-width: 12rem; max-height: 9rem; border-radius: var(--radius); margin: 0.25rem 0; }
 .badge-check { background: var(--missing); margin-left: 0.35rem; vertical-align: middle; }
 
 @media (prefers-reduced-motion: reduce) {

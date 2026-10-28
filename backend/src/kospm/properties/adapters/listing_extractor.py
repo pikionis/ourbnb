@@ -91,9 +91,9 @@ class ClaudeListingExtractor(ListingTextExtractor):
             # Logged by type and status only: the listing text never reaches a log.
             logger.warning("listing text not read: HTTP %s", error.status_code)
             raise ListingNotRead("the assistant answered with an error") from error
-        except anthropic.APIError as error:  # connection or timeout, after the SDK's retries
+        except anthropic.AnthropicError as error:  # connection, timeout, or the SDK itself
             logger.warning("listing text not read: %s", type(error).__name__)
-            raise ListingNotRead("the assistant is not reachable") from error
+            raise ListingNotRead("the assistant could not be asked") from error
         if response.stop_reason != "end_turn":  # refusal (after the fallback) or cut short
             logger.warning("listing text not read: stop reason %s", response.stop_reason)
             raise ListingNotRead(f"the assistant stopped: {response.stop_reason}")

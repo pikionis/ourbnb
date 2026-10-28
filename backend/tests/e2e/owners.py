@@ -99,6 +99,25 @@ def register_owner_in_admin(admin_client: Client, **overrides: Any) -> propertie
     return properties_models.Owner.objects.get(email=data["email"])
 
 
+def add_property_in_admin(
+    admin_client: Client, owner: properties_models.Owner, *, code: str, name: str
+) -> properties_models.Property:
+    """A property the admin adds for an owner, through the admin's whole add form."""
+    data = {
+        "owner": str(owner.pk),
+        "code": code,
+        "name": name,
+        "default_check_in_time": "15:00",
+        "default_check_out_time": "11:00",
+        "linen_par_level": "3",
+        "contract_signed_at_0": "",
+        "contract_signed_at_1": "",
+    }
+    added = admin_client.post(reverse("admin:properties_property_add"), data)
+    assert added.status_code == 302, added.content.decode()[:2000]
+    return properties_models.Property.objects.get(code=code)
+
+
 def invite(admin_client: Client, owner: properties_models.Owner) -> list[str]:
     response = admin_client.post(
         reverse("admin:properties_owner_changelist"),

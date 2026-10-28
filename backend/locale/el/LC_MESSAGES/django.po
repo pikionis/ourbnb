@@ -8,13 +8,19 @@ msgstr ""
 
 # --- properties: fixes after the review of the owner portal (Phase 2b) ----------------------------
 
+msgid "Your signed contract is uploaded: to change it, contact us."
+msgstr "Το υπογεγραμμένο συμβόλαιό σας έχει ανέβει: για αλλαγή επικοινωνήστε μαζί μας."
+
+msgid "Cleaners use the guests' code again"
+msgstr "Οι καθαριστές χρησιμοποιούν ξανά τον κωδικό των επισκεπτών"
+
 msgid "The verification of your bank account is under way: to start it again, contact us."
 msgstr "Η επαλήθευση του τραπεζικού σας λογαριασμού είναι σε εξέλιξη: για να ξεκινήσει ξανά, επικοινωνήστε μαζί μας."
 
 # --- properties: listing text read by the AI (Phase 2b, step 5) --------------------------------
 
-msgid "An AI assistant (Claude, by Anthropic) reads the text to fill in the form; we do not keep the text. Reading takes up to a minute. Do not paste key box codes or passwords."
-msgstr "Το κείμενο το διαβάζει ένας βοηθός τεχνητής νοημοσύνης (το Claude της Anthropic) για να συμπληρώσει τη φόρμα· εμείς δεν το κρατάμε. Η ανάγνωση διαρκεί έως ένα λεπτό. Μην επικολλάτε κωδικούς του κουτιού κλειδιών ή κωδικούς πρόσβασης."
+msgid "An AI assistant (Claude, by Anthropic) reads the text to fill in the form; we do not keep the text. Reading usually takes less than a minute. Do not paste key box codes or passwords."
+msgstr "Το κείμενο το διαβάζει ένας βοηθός τεχνητής νοημοσύνης (το Claude της Anthropic) για να συμπληρώσει τη φόρμα· εμείς δεν το κρατάμε. Η ανάγνωση συνήθως διαρκεί λιγότερο από ένα λεπτό. Μην επικολλάτε κωδικούς του κουτιού κλειδιών ή κωδικούς πρόσβασης."
 
 msgid "check this"
 msgstr "ελέγξτε το"

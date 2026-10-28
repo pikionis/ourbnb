@@ -103,6 +103,7 @@ CHANGE_THROUGH_THE_IKE: dict[str, StrOrPromise] = {
     "bank_verification": gettext_lazy(
         "The verification of your bank account is under way: to start it again, contact us."
     ),
+    "contract": gettext_lazy("Your signed contract is uploaded: to change it, contact us."),
     "email": gettext_lazy("Your email address is your login: to change it, contact us."),
     "property": gettext_lazy("This property is no longer being set up: to change it, contact us."),
 }
