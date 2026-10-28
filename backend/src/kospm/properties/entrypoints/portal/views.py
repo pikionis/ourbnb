@@ -13,7 +13,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
 
-from kospm.bootstrap import get_bus
+from kospm.bootstrap import get_bus, portal_throttle
 from kospm.properties.adapters.queries import OwnerOverview, owner_overview
 from kospm.properties.domain.commands import (
     ChangeBankAccount,
@@ -34,16 +34,23 @@ from kospm.properties.entrypoints.portal.texts import (
     ALREADY_REGISTERED_HINT,
     BANK_STATUS,
     PAYEE_CHECK_REFUSED,
+    THROTTLED,
     payee_check_refused,
 )
 from kospm.properties.entrypoints.texts import REQUIREMENT_LABELS, describe
 from kospm.properties.models import PropertyStatusChoices
-from kospm.shared.adapters.portal import account_email, owner_page
+from kospm.shared.adapters.portal import account_email, client_ip, owner_page
 from kospm.shared.domain import Command, DomainError
 from kospm.shared.unit_of_work import ConcurrencyError
 
 # Where a refused value is shown (InvalidValue.field → form field).
-FORM_FIELDS = {"name": "name", "phone": "phone", "afm": "afm", "iban": "iban"}
+FORM_FIELDS = {
+    "name": "name",
+    "phone": "phone",
+    "afm": "afm",
+    "iban": "iban",
+    "holder_name": "holder_name",
+}
 
 
 @owner_page
@@ -134,6 +141,13 @@ def bank(request: HttpRequest, owner_id: UUID) -> HttpResponse:
                 messages.success(request, _("Your bank account is verified. Thank you!"))
                 return redirect("portal:bank")
         overview = owner_overview(owner_id) or overview  # a wrong code was counted
+        if overview.bank.status is not BankAccountStatus.TRANSFER_SENT:
+            # No code is awaited any more (the last wrong code cancelled the transfer, or the
+            # page was old): the reason goes above what the page offers now.
+            for reason in code_form.errors.get("code", []):
+                messages.error(request, str(reason))
+            return redirect("portal:bank")
+        account_form = BankAccountForm(initial=_account_initial(overview))  # its new version
     return render(
         request,
         "portal/bank.html",
@@ -159,6 +173,11 @@ def _register(request: HttpRequest, owner_id: UUID) -> HttpResponse:
     email = account_email(request)
     form = RegistrationForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
+        if not portal_throttle("register").hit(f"ip:{client_ip(request)}", f"owner:{owner_id}"):
+            form.add_error(None, THROTTLED)
+            return render(
+                request, "portal/details.html", {"form": form, "overview": None, "email": email}
+            )
         data = form.cleaned_data
         command = RegisterOwner(
             owner_id=owner_id,
@@ -168,6 +187,7 @@ def _register(request: HttpRequest, owner_id: UUID) -> HttpResponse:
             afm=data["afm"],
             iban=data["iban"],
             holder_name=data["holder_name"],
+            acting_owner_id=owner_id,
         )
         try:
             get_bus().handle(command)

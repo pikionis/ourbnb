@@ -195,6 +195,7 @@ class OwnerAdmin(CommandModelAdmin[models.Owner]):
                     afm=data["afm"],
                     iban=data["iban"],
                     holder_name=data["bank_holder_name"],
+                    acting_owner_id=None,
                 )
             )
             return
@@ -209,6 +210,7 @@ class OwnerAdmin(CommandModelAdmin[models.Owner]):
                     email=data["email"],
                     phone=data["phone"],
                     expected_version=version,
+                    acting_owner_id=None,
                 )
             )
             version = None
@@ -219,16 +221,21 @@ class OwnerAdmin(CommandModelAdmin[models.Owner]):
                     iban=data["iban"],
                     holder_name=data["bank_holder_name"],
                     expected_version=version,
+                    acting_owner_id=None,
                 )
             )
         send_or_refuse(*commands)
+        if commands:
+            version = None  # the first command checked it and holds the row (forms.py)
         if data.get("payee_check"):
+            # The check answers for the transfer this page showed: never for a newer one.
             self._send_reported(
                 request,
                 RecordTestTransfer(
                     owner_id=obj.pk,
                     result=data["payee_check"],
                     bank_name=data.get("payee_check_name", ""),
+                    expected_version=version,
                 ),
                 _("The test transfer is recorded."),
             )
@@ -236,7 +243,9 @@ class OwnerAdmin(CommandModelAdmin[models.Owner]):
             # Not a refusal of the save: a wrong attempt is recorded and must stay recorded.
             self._send_reported(
                 request,
-                ConfirmBankAccount(owner_id=obj.pk, code=data["verification_code"]),
+                ConfirmBankAccount(
+                    owner_id=obj.pk, code=data["verification_code"], acting_owner_id=None
+                ),
                 _("The bank account is verified."),
             )
 
@@ -255,7 +264,7 @@ class OwnerAdmin(CommandModelAdmin[models.Owner]):
     ) -> None:
         for owner in queryset:
             try:
-                send(StartBankAccountVerification(owner_id=owner.pk))
+                send(StartBankAccountVerification(owner_id=owner.pk, acting_owner_id=None))
             except (DomainError, ConcurrencyError) as error:
                 self.message_user(request, f"{owner.name}: {describe(error)}", messages.ERROR)
                 continue
@@ -308,8 +317,9 @@ class OwnerAdmin(CommandModelAdmin[models.Owner]):
     @staticmethod
     def _transfer_instructions(owner: models.Owner) -> str:
         return _(
-            "%(name)s: send €0.01 to %(iban)s, payee %(holder)s, with reference %(code)s. Then "
-            "record below what the bank's payee check answered."
+            "%(name)s: send €0.01 to %(iban)s, payee %(holder)s, with reference %(code)s. "
+            "Compare the payee with the owner's name first: the bank only checks that the name "
+            "belongs to the IBAN. Then record below what the bank's payee check answered."
         ) % {
             "name": owner.name,
             "iban": Iban(owner.iban).formatted(),

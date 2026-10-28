@@ -5,7 +5,16 @@ from django.db import migrations, models
 
 def holder_name_from_owner_name(apps, schema_editor):
     """Owners registered before Phase 2b get their own name as the account holder's name; the
-    admin corrects it to the bank's spelling when needed (a new name is verified again)."""
+    admin corrects it to the bank's spelling when needed (a new name is verified again).
+
+    No production database existed before Phase 2b (the first deploy is Phase 7), so this only
+    meets development data:
+    - A verified account stays verified, but its holder name was copied here, not checked by a
+      bank.
+    - A `pending` account (in Phase 2: transfer sent, code awaited) stays `pending`. The admin
+      records the transfer again with the bank's payee check (ADR 0018) before a code is
+      accepted.
+    """
     Owner = apps.get_model("properties", "Owner")
     for owner in Owner.objects.filter(bank_holder_name=""):
         owner.bank_holder_name = " ".join(owner.name.split())[:70]

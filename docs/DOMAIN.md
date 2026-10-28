@@ -290,6 +290,9 @@ with `/domain-change` if the business wants otherwise.
   and the links already sent to the old one stop working.
 - An email link never changes anything when it is only opened: the owner presses a button
   (mail scanners open links). A login address has at most 150 characters.
+- The owner starts the bank-account verification in the portal only for an unverified account.
+  A verification under way is restarted by the IKE only, because a restart cancels the
+  transfer that may have been sent.
 - Listing text:
   - The text is at most 20,000 characters, and an owner may have it read 10 times an hour. Both
     limits are configuration, for cost.
@@ -576,4 +579,8 @@ properties, owners with `show_on_website = True` (name/logo), testimonials, mana
   be used? — accountant/lawyer.
 - One contract per owner or one per property? — lawyer.
 - Privacy notice for owner accounts (GDPR Art. 13) — lawyer.
+- Bank payee check `NOT_POSSIBLE`: today it always means the test transfer was sent. Should
+  the admin be able to record "not possible, not sent", and what happens to the account then?
+- May payouts go to an account whose holder is not the owner (a spouse, a company)? Today the
+  admin compares the payee with the owner's name and decides.
 - Whether the WhatsApp `wa.me` link survives Airbnb's message filter (test on a real booking).

@@ -258,7 +258,11 @@ class PropertyForm(forms.ModelForm[models.Property]):
         if not self.adding:
             return [*self._edits(property_id, preview=False, version=data.get("version"))]
         create = CreateProperty(
-            property_id=property_id, owner_id=data["owner"].pk, code=data["code"], name=data["name"]
+            property_id=property_id,
+            owner_id=data["owner"].pk,
+            code=data["code"],
+            name=data["name"],
+            acting_owner_id=None,
         )
         return [create, *self._edits(property_id, preview=False, version=None)]
 
@@ -289,13 +293,16 @@ class PropertyForm(forms.ModelForm[models.Property]):
                     signed_at=data.get("contract_signed_at"),
                     commission_rate=data.get("contract_commission_rate"),
                     owner_cleaning_charge=data.get("contract_owner_cleaning_charge"),
+                    acting_owner_id=None,
                 )
             )
         # Sent whenever the field changed, also to empty: the domain refuses removing a number.
         if "sublease_declaration_number" in self.changed_data:
             edits.append(
                 RecordSubleaseDeclaration(
-                    property_id=property_id, number=data["sublease_declaration_number"]
+                    property_id=property_id,
+                    number=data["sublease_declaration_number"],
+                    acting_owner_id=None,
                 )
             )
         if "ama_number" in self.changed_data:
@@ -340,6 +347,7 @@ class PropertyForm(forms.ModelForm[models.Property]):
             linen_par_level=data["linen_par_level"],
             preferred_cleaner_id=self.instance.preferred_cleaner_id,
             expected_version=version,
+            acting_owner_id=None,
         )
 
     # --- helpers ----------------------------------------------------------------------------

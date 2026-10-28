@@ -184,6 +184,13 @@ class Owner(Aggregate[UUID]):
             payee_check=None,
         )
 
+    def start_own_bank_verification(self, code: str) -> None:
+        """The owner starts it in the portal, for an unverified account only: restarting a
+        verification under way cancels the transfer the IKE may have sent, so the IKE does it."""
+        if self.bank_account.status in (BankAccountStatus.PENDING, BankAccountStatus.TRANSFER_SENT):
+            raise ChangeThroughTheIke("bank_verification")
+        self.start_bank_verification(code)
+
     def record_test_transfer(self, check: PayeeCheck) -> None:
         """The admin sent the test transfer, or did not (NO_MATCH), and records the bank's payee
         check. A close match takes the bank's spelling of the name: it is the bank's own, so the
@@ -212,6 +219,8 @@ class Owner(Aggregate[UUID]):
         and reports the error afterwards. The last allowed wrong code cancels the transfer.
         """
         account = self.bank_account
+        if account.status is BankAccountStatus.VERIFIED:
+            raise BankAccountAlreadyVerified("the bank account is verified already")
         if account.status is BankAccountStatus.PENDING:
             raise TransferNotSentYet("the IKE has not sent the test transfer yet")
         if account.status is not BankAccountStatus.TRANSFER_SENT:

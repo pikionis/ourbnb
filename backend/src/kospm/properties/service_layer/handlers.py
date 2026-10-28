@@ -69,6 +69,8 @@ from kospm.shared.domain import Command, DomainEvent, Money
 
 
 def register_owner(cmd: RegisterOwner, uow: PropertiesUnitOfWork) -> None:
+    """Onboarding step 1, by the IKE or, from the portal, by the owner for themself only."""
+    _check_acting_owner(cmd.owner_id, cmd.acting_owner_id)
     email, afm, iban = Email(cmd.email), Afm(cmd.afm), Iban(cmd.iban)
     holder_name = AccountHolderName(cmd.holder_name)
     with uow:
@@ -123,7 +125,10 @@ def start_bank_account_verification(
     code = bank_account_verifier.new_code()
     with uow:
         owner = _owner(uow, cmd.owner_id, cmd.acting_owner_id)
-        owner.start_bank_verification(code)
+        if cmd.acting_owner_id is None:
+            owner.start_bank_verification(code)
+        else:
+            owner.start_own_bank_verification(code)
         bank_account_verifier.request_test_transfer(
             owner_id=owner.id,
             iban=owner.bank_account.iban,
@@ -138,7 +143,8 @@ def record_test_transfer(cmd: RecordTestTransfer, uow: PropertiesUnitOfWork) -> 
     """The admin records the test transfer and the bank's payee check (ADR 0018)."""
     check = _payee_check(cmd.result, cmd.bank_name)
     with uow:
-        uow.owners.get(cmd.owner_id).record_test_transfer(check)
+        owner = uow.owners.get(cmd.owner_id, expected_version=cmd.expected_version)
+        owner.record_test_transfer(check)
         uow.commit()
 
 
@@ -159,11 +165,16 @@ def _owner(
     acting_owner_id: UUID | None,
     expected_version: int | None = None,
 ) -> Owner:
-    """The owner a command is about. From the portal, only the acting owner's own (ADR 0017):
-    anyone else's is "not found", so the portal never tells that it exists."""
+    """The owner a command is about."""
+    _check_acting_owner(owner_id, acting_owner_id)
+    return uow.owners.get(owner_id, expected_version=expected_version)
+
+
+def _check_acting_owner(owner_id: UUID, acting_owner_id: UUID | None) -> None:
+    """From the portal, only the acting owner's own data (ADR 0017): anyone else's is "not
+    found", so the portal never tells that it exists."""
     if acting_owner_id is not None and acting_owner_id != owner_id:
         raise OwnerNotFound(f"no owner has id {owner_id}")
-    return uow.owners.get(owner_id, expected_version=expected_version)
 
 
 def _payee_check(result: str, bank_name: str) -> PayeeCheck:

@@ -116,6 +116,8 @@ class TestBankAccount:
         admin_records_transfer(admin_client, owner, "match")
         assert owner.bank_account_status == "transfer_sent"
         assert 'value="code"' in client.get(BANK).content.decode()
+        for page in (BANK, DASHBOARD):  # the code reaches the owner only on their statement
+            assert owner.bank_verification_code not in client.get(page).content.decode()
 
         wrong = client.post(BANK, {"action": "code", "code": "000000"})
         assert wrong.status_code == 200
@@ -163,8 +165,85 @@ class TestBankAccount:
     def test_no_code_before_the_transfer_is_sent(self) -> None:
         client, _ = registered_owner()
         client.post(BANK, {"action": "verify"})
-        response = client.post(BANK, {"action": "code", "code": "123456"})
-        assert "δεν έχει σταλεί" in response.content.decode()
+        response = client.post(BANK, {"action": "code", "code": "123456"}, follow=True)
+        assert any("δεν έχει σταλεί" in message for message in messages_of(response))
+
+    def test_the_payee_check_is_recorded_only_from_a_current_page(
+        self, admin_client: Client
+    ) -> None:
+        client, owner = registered_owner()
+        client.post(BANK, {"action": "verify"})
+        owner.refresh_from_db()
+        page_version = owner.version  # the admin opens the owner's page
+        admin_client.post(  # meanwhile, in another tab: a new transfer, with a new code
+            reverse("admin:properties_owner_changelist"),
+            {"action": "start_bank_verification", "_selected_action": [str(owner.pk)]},
+        )
+        owner.refresh_from_db()
+        new_code = owner.bank_verification_code
+
+        admin_client.post(  # only the payee check is new on the page: no other command checks
+            reverse("admin:properties_owner_change", args=[owner.pk]),
+            owner_form(
+                iban=owner.iban,
+                bank_holder_name=owner.bank_holder_name,
+                version=page_version,
+                payee_check="match",
+            ),
+        )
+
+        owner.refresh_from_db()  # "match" was answered for the old code's transfer
+        assert (owner.bank_account_status, owner.bank_verification_code) == ("pending", new_code)
+
+    def test_a_transfer_on_its_way_is_not_restarted_from_the_portal(
+        self, admin_client: Client
+    ) -> None:
+        client, owner = registered_owner()
+        client.post(BANK, {"action": "verify"})
+        admin_records_transfer(admin_client, owner, "match")
+        code = owner.bank_verification_code
+
+        response = client.post(BANK, {"action": "verify"}, follow=True)
+
+        owner.refresh_from_db()
+        assert (owner.bank_account_status, owner.bank_verification_code) == ("transfer_sent", code)
+        assert any("σε εξέλιξη" in message for message in messages_of(response))
+
+    def test_after_a_wrong_code_the_page_is_current(self, admin_client: Client) -> None:
+        client, owner = registered_owner()
+        client.post(BANK, {"action": "verify"})
+        admin_records_transfer(admin_client, owner, "match")
+
+        wrong = client.post(BANK, {"action": "code", "code": "000000"})
+
+        owner.refresh_from_db()  # the wrong attempt was counted: a new version
+        assert f'name="version" value="{owner.version}"' in wrong.content.decode()
+        saved = client.post(
+            BANK,
+            {
+                "action": "account",
+                "iban": OTHER_VALID_IBAN,
+                "holder_name": "PAPADOPOULOU MARIA",
+                "version": str(owner.version),
+            },
+        )
+        assert saved["Location"] == BANK
+
+    def test_after_the_last_wrong_code_the_owner_asks_for_a_new_transfer(
+        self, admin_client: Client
+    ) -> None:
+        client, owner = registered_owner()
+        client.post(BANK, {"action": "verify"})
+        admin_records_transfer(admin_client, owner, "match")
+        for _ in range(2):
+            client.post(BANK, {"action": "code", "code": "000000"})
+
+        last = client.post(BANK, {"action": "code", "code": "000000"}, follow=True)
+
+        page = last.content.decode()
+        assert 'value="verify"' in page
+        assert 'value="code"' not in page
+        assert any("Χρειάζεται νέα" in message for message in messages_of(last))
 
 
 class TestOwnData:
@@ -181,7 +260,25 @@ class TestOwnData:
         assert "KOS-N1" not in page
         assert "Σπίτι του Νίκου" not in page
 
-    def test_messages_never_name_another_owner(self, admin_client: Client) -> None:
-        client, _ = registered_owner()
-        response = client.post(BANK, {"action": "verify"}, follow=True)
-        assert all("nikos" not in message for message in messages_of(response))
+    def test_a_refusal_never_names_another_owner(self, admin_client: Client) -> None:
+        register_owner_in_admin(
+            admin_client, name="Νίκος Νικολάου", email="nikos@example.com", afm=OTHER_VALID_AFM
+        )
+        client = logged_in_owner()
+
+        refused = client.post(DETAILS, registration(afm=OTHER_VALID_AFM)).content.decode()
+
+        assert "ΑΦΜ" in refused  # refused, as "this tax number is already registered"
+        assert "Νικολάου" not in refused
+        assert "nikos@example.com" not in refused
+
+    def test_registration_attempts_are_limited(self, admin_client: Client, settings: Any) -> None:
+        # So that "already registered" cannot be used to test many tax numbers.
+        register_owner_in_admin(admin_client, email="nikos@example.com", afm=OTHER_VALID_AFM)
+        client = logged_in_owner()
+        settings.PORTAL_THROTTLE_MAX_ATTEMPTS = 1
+
+        client.post(DETAILS, registration(afm=OTHER_VALID_AFM))
+        second = client.post(DETAILS, registration(afm=OTHER_VALID_AFM))
+
+        assert "Πολλές προσπάθειες" in second.content.decode()

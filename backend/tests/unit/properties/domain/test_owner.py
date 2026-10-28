@@ -206,6 +206,22 @@ class TestTestTransfer:
         with pytest.raises(BankVerificationNotStarted):
             sent_owner().record_test_transfer(MATCH)
 
+    def test_the_owner_starts_it_for_an_unverified_account(self) -> None:
+        subject = owner()
+        subject.start_own_bank_verification("123456")
+        assert status_of(subject) is BankAccountStatus.PENDING
+
+    def test_a_verification_under_way_is_restarted_by_the_ike_only(self) -> None:
+        # Restarting cancels the transfer already sent: the owner asks the IKE (DOMAIN §5).
+        for subject in (pending_owner(), sent_owner()):
+            with pytest.raises(ChangeThroughTheIke) as refused:
+                subject.start_own_bank_verification("654321")
+            assert refused.value.item == "bank_verification"
+            assert subject.bank_account.verification_code == "123456"
+        restarted = sent_owner()
+        restarted.start_bank_verification("654321")
+        assert status_of(restarted) is BankAccountStatus.PENDING
+
     def test_starting_again_forgets_the_previous_check(self) -> None:
         subject = sent_owner("123456", PayeeCheck(PayeeCheckResult.NO_MATCH))
         subject.start_bank_verification("654321")
@@ -276,6 +292,10 @@ class TestCode:
     def test_a_verified_account_is_not_verified_again(self) -> None:
         with pytest.raises(BankAccountAlreadyVerified):
             verified_owner().start_bank_verification("654321")
+
+    def test_a_code_for_a_verified_account_says_it_is_verified(self) -> None:
+        with pytest.raises(BankAccountAlreadyVerified):
+            verified_owner().confirm_bank_account("123456", POLICY)
 
     def test_a_code_with_letters_is_simply_wrong(self) -> None:
         assert sent_owner("123456").confirm_bank_account("12345α", POLICY).verified is False

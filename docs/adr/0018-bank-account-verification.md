@@ -66,8 +66,10 @@ Rejected for now:
 - **The proof is stronger than before.**
   - The bank confirms that the name matches the IBAN, and the code proves the owner can read that
     account's statement.
-  - An attacker who took over an owner's portal account and entered their own IBAN would fail the
-    name check.
+  - The check proves whose account an IBAN is, not that it is the owner's. Someone who took
+    over an owner's portal account before the verification could enter their own IBAN and their
+    own name, and the bank would confirm them. So the admin compares the payee with the owner's
+    name before sending; the admin's instructions show both and say so.
   - On top of that, the portal locks the IBAN once it is verified (DOMAIN §5).
 - `NOT_POSSIBLE` accounts rely on the code only. The admin decides case by case, and the result
   stays recorded.

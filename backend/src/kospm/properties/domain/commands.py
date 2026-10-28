@@ -4,9 +4,10 @@ Commands carry plain values, as a form or an API sends them; the handlers turn t
 objects, so validation lives in one place (the domain). The admin and the owner portal send the
 same commands.
 
-`acting_owner_id` names the owner who sends a command from the owner portal (ADR 0017); None
-means the IKE (the admin). The handler then refuses another owner's data and what DOMAIN §5
-keeps for the IKE.
+`acting_owner_id` says who sends a command that the owner portal can send: the owner, from the
+portal (ADR 0017), or None for the IKE (the admin). It has no default, so every sender says who
+acts: a portal page that left it out would otherwise act with the IKE's powers. From the
+portal, the handler refuses another owner's data and what DOMAIN §5 keeps for the IKE.
 
 `expected_version` (on commands sent from a form) is the version the form was rendered with: the
 handler refuses with ConcurrencyError if someone saved the aggregate since (ADR 0016). Secrets
@@ -30,6 +31,7 @@ class RegisterOwner(Command):
     afm: str
     iban: str
     holder_name: str
+    acting_owner_id: UUID | None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -39,7 +41,7 @@ class UpdateOwnerDetails(Command):
     email: str
     phone: str
     expected_version: int | None = None
-    acting_owner_id: UUID | None = None
+    acting_owner_id: UUID | None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -50,7 +52,7 @@ class ChangeBankAccount(Command):
     iban: str
     holder_name: str
     expected_version: int | None = None
-    acting_owner_id: UUID | None = None
+    acting_owner_id: UUID | None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -58,7 +60,7 @@ class StartBankAccountVerification(Command):
     """Prepare the €0.01 test transfer: the handler creates the code to put in its reference."""
 
     owner_id: UUID
-    acting_owner_id: UUID | None = None
+    acting_owner_id: UUID | None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -69,13 +71,14 @@ class RecordTestTransfer(Command):
     owner_id: UUID
     result: str
     bank_name: str = ""
+    expected_version: int | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
 class ConfirmBankAccount(Command):
     owner_id: UUID
     code: str = field(repr=False)
-    acting_owner_id: UUID | None = None
+    acting_owner_id: UUID | None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -86,7 +89,7 @@ class CreateProperty(Command):
     owner_id: UUID
     name: str
     code: str | None = None
-    acting_owner_id: UUID | None = None
+    acting_owner_id: UUID | None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -113,7 +116,7 @@ class UpdatePropertyProfile(Command):
     linen_par_level: int
     preferred_cleaner_id: UUID | None
     expected_version: int | None = None
-    acting_owner_id: UUID | None = None
+    acting_owner_id: UUID | None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -138,7 +141,7 @@ class SignContract(Command):
     commission_rate: Decimal | None = None
     owner_cleaning_charge: Decimal | None = None
     expected_version: int | None = None
-    acting_owner_id: UUID | None = None
+    acting_owner_id: UUID | None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -146,7 +149,7 @@ class RecordSubleaseDeclaration(Command):
     property_id: UUID
     number: str
     expected_version: int | None = None
-    acting_owner_id: UUID | None = None
+    acting_owner_id: UUID | None
 
 
 @dataclass(frozen=True, kw_only=True)

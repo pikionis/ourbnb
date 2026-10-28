@@ -6,6 +6,11 @@ msgstr ""
 "Language: el\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+# --- properties: fixes after the review of the owner portal (Phase 2b) ----------------------------
+
+msgid "The verification of your bank account is under way: to start it again, contact us."
+msgstr "Η επαλήθευση του τραπεζικού σας λογαριασμού είναι σε εξέλιξη: για να ξεκινήσει ξανά, επικοινωνήστε μαζί μας."
+
 # --- properties: listing text read by the AI (Phase 2b, step 5) --------------------------------
 
 msgid "An AI assistant (Claude, by Anthropic) reads the text to fill in the form; we do not keep the text. Reading takes up to a minute. Do not paste key box codes or passwords."
@@ -283,9 +288,6 @@ msgstr "%(code)s: ανενεργό."
 msgid "%(code)s: offboarded."
 msgstr "%(code)s: αποχώρησε."
 
-msgid "%(name)s: send €0.01 to %(iban)s with reference %(code)s, then enter the code the owner reads on their statement."
-msgstr "%(name)s: στείλε 0,01 € στο %(iban)s με αιτιολογία %(code)s και μετά γράψε τον κωδικό που θα δει ο ιδιοκτήτης στην κίνηση του λογαριασμού του."
-
 msgid "A property that has worked must keep a complete profile. Missing: %(items)s."
 msgstr "Ένα ακίνητο που έχει λειτουργήσει πρέπει να έχει πλήρες προφίλ. Λείπουν: %(items)s."
 
@@ -404,34 +406,34 @@ msgid "English"
 msgstr "Αγγλικά"
 
 msgid "Enter a name."
-msgstr "Γράψε όνομα."
+msgstr "Γράψτε όνομα."
 
 msgid "Enter a new code or tick “cleaners use the guests' code again”, not both."
-msgstr "Γράψε νέο κωδικό ή τσέκαρε «οι καθαριστές χρησιμοποιούν ξανά τον κωδικό των επισκεπτών», όχι και τα δύο."
+msgstr "Γράψτε νέο κωδικό ή τσεκάρετε «οι καθαριστές χρησιμοποιούν ξανά τον κωδικό των επισκεπτών», όχι και τα δύο."
 
 msgid "Enter a phone number."
-msgstr "Γράψε αριθμό τηλεφώνου."
+msgstr "Γράψτε αριθμό τηλεφώνου."
 
 msgid "Enter a valid email address."
-msgstr "Γράψε ένα έγκυρο email."
+msgstr "Γράψτε ένα έγκυρο email."
 
 msgid "Enter a valid IBAN."
-msgstr "Γράψε έγκυρο IBAN."
+msgstr "Γράψτε έγκυρο IBAN."
 
 msgid "Enter a valid tax number (AFM): 9 digits with a correct check digit."
-msgstr "Γράψε έγκυρο ΑΦΜ: 9 ψηφία με σωστό ψηφίο ελέγχου."
+msgstr "Γράψτε έγκυρο ΑΦΜ: 9 ψηφία με σωστό ψηφίο ελέγχου."
 
 msgid "Enter both coordinates: latitude from -90 to 90 and longitude from -180 to 180, with at most 6 decimals."
-msgstr "Γράψε και τις δύο συντεταγμένες: γεωγραφικό πλάτος από -90 έως 90 και μήκος από -180 έως 180, με έως 6 δεκαδικά."
+msgstr "Γράψτε και τις δύο συντεταγμένες: γεωγραφικό πλάτος από -90 έως 90 και μήκος από -180 έως 180, με έως 6 δεκαδικά."
 
 msgid "Enter the AMA number. A recorded number can be corrected, not removed."
-msgstr "Γράψε τον ΑΜΑ. Ένας καταχωρημένος αριθμός διορθώνεται, δεν αφαιρείται."
+msgstr "Γράψτε τον ΑΜΑ. Ένας καταχωρημένος αριθμός διορθώνεται, δεν αφαιρείται."
 
 msgid "Enter the date and time the contract was signed."
-msgstr "Γράψε την ημερομηνία και ώρα υπογραφής του συμβολαίου."
+msgstr "Γράψτε την ημερομηνία και ώρα υπογραφής του συμβολαίου."
 
 msgid "Enter the sublease declaration number. A recorded number can be corrected, not removed."
-msgstr "Γράψε τον αριθμό της δήλωσης υπεκμίσθωσης. Ένας καταχωρημένος αριθμός διορθώνεται, δεν αφαιρείται."
+msgstr "Γράψτε τον αριθμό της δήλωσης υπεκμίσθωσης. Ένας καταχωρημένος αριθμός διορθώνεται, δεν αφαιρείται."
 
 msgid "Everything is in place."
 msgstr "Όλα είναι έτοιμα."
@@ -593,13 +595,13 @@ msgid "signed contract"
 msgstr "υπογεγραμμένο συμβόλαιο"
 
 msgid "Someone else changed this in the meantime. Reload the page and try again."
-msgstr "Κάποιος άλλος το άλλαξε στο μεταξύ. Φόρτωσε ξανά τη σελίδα και δοκίμασε πάλι."
+msgstr "Κάποιος άλλος το άλλαξε στο μεταξύ. Φορτώστε ξανά τη σελίδα και δοκιμάστε πάλι."
 
 msgid "Start the bank account verification (test transfer)"
 msgstr "Έναρξη επιβεβαίωσης τραπεζικού λογαριασμού (δοκιμαστική μεταφορά)"
 
-msgid "Start the verification first: send the test transfer."
-msgstr "Ξεκίνα πρώτα την επιβεβαίωση: στείλε τη δοκιμαστική μεταφορά."
+msgid "No test transfer is waiting for a code: start the verification first."
+msgstr "Καμία δοκιμαστική μεταφορά δεν περιμένει κωδικό: ξεκινήστε πρώτα την επαλήθευση."
 
 msgid "status"
 msgstr "κατάσταση"
@@ -623,7 +625,7 @@ msgid "The 6 digits the owner read on their bank statement."
 msgstr "Τα 6 ψηφία που είδε ο ιδιοκτήτης στην κίνηση του λογαριασμού του."
 
 msgid "The bank account is already verified."
-msgstr "Ο τραπεζικός λογαριασμός είναι ήδη επιβεβαιωμένος."
+msgstr "Ο τραπεζικός λογαριασμός είναι ήδη επαληθευμένος."
 
 msgid "The bank account is verified."
 msgstr "Ο τραπεζικός λογαριασμός επιβεβαιώθηκε."
@@ -650,10 +652,10 @@ msgid "Unverified"
 msgstr "Ανεπιβεβαίωτος"
 
 msgid "Upload a photo: JPG, PNG, WebP or HEIC."
-msgstr "Ανέβασε φωτογραφία: JPG, PNG, WebP ή HEIC."
+msgstr "Ανεβάστε φωτογραφία: JPG, PNG, WebP ή HEIC."
 
 msgid "Upload the signed contract as a PDF."
-msgstr "Ανέβασε το υπογεγραμμένο συμβόλαιο σε PDF."
+msgstr "Ανεβάστε το υπογεγραμμένο συμβόλαιο σε PDF."
 
 msgid "Use 2 to 16 characters: Latin letters or digits, in groups joined by single hyphens (e.g. KOS-A1)."
 msgstr "Χρησιμοποίησε 2 έως 16 χαρακτήρες: λατινικά γράμματα ή ψηφία, σε ομάδες με μία παύλα ανάμεσα (π.χ. KOS-A1)."
@@ -673,8 +675,8 @@ msgstr "ερωτήθηκε για το site"
 msgid "WhatsApp"
 msgstr "WhatsApp"
 
-msgid "Wrong code. Send a new test transfer."
-msgstr "Λάθος κωδικός. Στείλε νέα δοκιμαστική μεταφορά."
+msgid "Wrong code. A new test transfer is needed."
+msgstr "Λάθος κωδικός. Χρειάζεται νέα δοκιμαστική μεταφορά."
 
 msgid "Wrong code. %(count)d attempt left."
 msgid_plural "Wrong code. %(count)d attempts left."
@@ -915,8 +917,8 @@ msgstr "περιεχόμενο"
 
 # --- properties: the owner portal (Phase 2b, step 3) and the payee check (ADR 0018) ------------
 
-msgid "%(name)s: send €0.01 to %(iban)s, payee %(holder)s, with reference %(code)s. Then record below what the bank's payee check answered."
-msgstr "%(name)s: στείλε 0,01 € στο %(iban)s, δικαιούχος %(holder)s, με αιτιολογία %(code)s. Μετά κατέγραψε παρακάτω τι απάντησε ο έλεγχος ονόματος της τράπεζας."
+msgid "%(name)s: send €0.01 to %(iban)s, payee %(holder)s, with reference %(code)s. Compare the payee with the owner's name first: the bank only checks that the name belongs to the IBAN. Then record below what the bank's payee check answered."
+msgstr "%(name)s: στείλτε 0,01 € στο %(iban)s, δικαιούχος %(holder)s, με αιτιολογία %(code)s. Συγκρίνετε πρώτα τον δικαιούχο με το όνομα του ιδιοκτήτη: η τράπεζα ελέγχει μόνο ότι το όνομα αντιστοιχεί στο IBAN. Μετά καταγράψτε παρακάτω τι απάντησε ο έλεγχος ονόματος της τράπεζας."
 
 msgid "%(ready)s of %(total)s ready"
 msgstr "%(ready)s από %(total)s έτοιμα"
@@ -937,7 +939,7 @@ msgid "Change the account"
 msgstr "Αλλαγή λογαριασμού"
 
 msgid "Choose the bank's answer; only “the name almost matches” takes the bank's spelling."
-msgstr "Επίλεξε την απάντηση της τράπεζας· μόνο το «το όνομα σχεδόν ταιριάζει» παίρνει τη γραφή της τράπεζας."
+msgstr "Επιλέξτε την απάντηση της τράπεζας· μόνο το «το όνομα σχεδόν ταιριάζει» παίρνει τη γραφή της τράπεζας."
 
 msgid "Code"
 msgstr "Κωδικός"

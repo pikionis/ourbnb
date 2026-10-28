@@ -33,7 +33,7 @@ def test_every_refused_field_has_a_message() -> None:
 
 @pytest.mark.parametrize(
     ("language", "expected"),
-    [("en", "Enter a valid IBAN."), ("el", "Γράψε έγκυρο IBAN.")],
+    [("en", "Enter a valid IBAN."), ("el", "Γράψτε έγκυρο IBAN.")],
 )
 def test_a_refused_value_is_described_in_the_reader_s_language(
     language: str, expected: str

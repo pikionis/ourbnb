@@ -21,6 +21,10 @@ PAYEE_CHECK_REFUSED = gettext_lazy(
 
 ALREADY_REGISTERED_HINT = gettext_lazy("Contact us and we will send you an invitation.")
 
+# Registrations are throttled, so the answer "already registered" cannot be used to test many
+# tax numbers (the same words as identity's other throttled pages).
+THROTTLED = gettext_lazy("Too many attempts. Try again in a few minutes.")
+
 
 def payee_check_refused(result: PayeeCheckResult | None) -> bool:
     return result is PayeeCheckResult.NO_MATCH

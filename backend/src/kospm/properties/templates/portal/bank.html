@@ -16,7 +16,7 @@
     <p class="alert alert-warning" role="alert">{{ payee_check_refused_text }}</p>
   {% endif %}
 
-  {% if bank.status == "transfer_sent" or code_form.errors %}
+  {% if bank.status == "transfer_sent" %}
     <h2>{% translate "Enter the code" %}</h2>
     <p>{% translate "Look at the €0.01 transfer on your statement: the code is in its reference. It may take 1–2 working days to appear." %}</p>
     <form method="post" novalidate>

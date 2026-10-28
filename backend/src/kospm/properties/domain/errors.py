@@ -93,8 +93,8 @@ class TransferNotSentYet(DomainError):
 class ChangeThroughTheIke(DomainError):
     """The owner may not change this in the portal; the IKE changes it (DOMAIN §5, owner portal).
 
-    `item` names what: "bank_account" (verified already), "email" (the login), "property" (no
-    longer onboarding).
+    `item` names what: "bank_account" (verified already), "bank_verification" (under way: a
+    restart cancels the transfer sent), "email" (the login), "property" (no longer onboarding).
     """
 
     def __init__(self, item: str) -> None:

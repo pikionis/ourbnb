@@ -100,6 +100,9 @@ CHANGE_THROUGH_THE_IKE: dict[str, StrOrPromise] = {
     "bank_account": gettext_lazy(
         "Your bank account is verified: to change it, contact us. This protects your payouts."
     ),
+    "bank_verification": gettext_lazy(
+        "The verification of your bank account is under way: to start it again, contact us."
+    ),
     "email": gettext_lazy("Your email address is your login: to change it, contact us."),
     "property": gettext_lazy("This property is no longer being set up: to change it, contact us."),
 }
@@ -142,9 +145,9 @@ def describe(error: Exception) -> str:
                 "Wrong code. %(count)d attempts left.",
                 error.attempts_left,
             ) % {"count": error.attempts_left}
-        return _("Wrong code. Send a new test transfer.")
+        return _("Wrong code. A new test transfer is needed.")
     if isinstance(error, BankVerificationNotStarted):
-        return _("Start the verification first: send the test transfer.")
+        return _("No test transfer is waiting for a code: start the verification first.")
     if isinstance(error, TransferNotSentYet):
         return _("The test transfer has not been sent yet.")
     if isinstance(error, ChangeThroughTheIke):

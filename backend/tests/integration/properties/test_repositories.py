@@ -15,9 +15,9 @@ from kospm.properties.domain.errors import (
     PropertyCodeTaken,
     PropertyNotFound,
 )
-from kospm.properties.domain.owner import BankAccountStatus, Owner
+from kospm.properties.domain.owner import BankAccountStatus, Owner, PayeeCheck, PayeeCheckResult
 from kospm.properties.domain.property import Property, PropertyStatus
-from kospm.properties.domain.value_objects import Afm, Email, PropertyCode
+from kospm.properties.domain.value_objects import AccountHolderName, Afm, Email, PropertyCode
 from kospm.shared.clock import FixedClock
 from kospm.shared.domain import Money
 from kospm.shared.outbox.adapters import DjangoOutbox
@@ -96,6 +96,24 @@ class TestOwnerRepository:
         with uow:
             account = uow.owners.get(saved.id).bank_account
         assert (account.status, account.verification_code) == (BankAccountStatus.PENDING, "123456")
+
+    def test_a_sent_transfer_keeps_the_banks_spelling_and_check(self) -> None:
+        saved = stored_owner()
+        check = PayeeCheck(PayeeCheckResult.CLOSE_MATCH, AccountHolderName("PAPADOPOULOU M"))
+        uow = new_uow()
+        with uow:
+            subject = uow.owners.get(saved.id)
+            subject.start_bank_verification("123456")
+            subject.record_test_transfer(check)
+            uow.commit()
+        with uow:
+            account = uow.owners.get(saved.id).bank_account
+        assert (account.status, account.holder_name, account.payee_check) == (
+            BankAccountStatus.TRANSFER_SENT,
+            AccountHolderName("PAPADOPOULOU M"),
+            check,
+        )
+        assert account.verification_code == "123456"
 
     def test_unknown_owner(self) -> None:
         uow = new_uow()
@@ -319,6 +337,7 @@ def test_model_choices_match_the_domain() -> None:
     assert set(models.BankAccountStatusChoices.values) == {
         status.value for status in BankAccountStatus
     }
+    assert set(models.PayeeCheckChoices.values) == {result.value for result in PayeeCheckResult}
 
 
 def test_contract_terms_keep_their_precision() -> None:
