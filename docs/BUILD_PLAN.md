@@ -172,17 +172,25 @@ contains lockbox codes and nothing is saved until the owner saves.
 
 ## Phase 3 — Reservations context & iCal sync
 Domain:
-- [ ] `Reservation` aggregate (see DOMAIN §6), `Channel` enum, overlap check as domain service
-      `ReservationCalendar(property_id).accept(reservation)` raising `OverlappingReservation`.
+- [ ] `ReservationCalendar` aggregate, one per property, with `Reservation` entities (DOMAIN §6).
+      `Channel` enum. Overlap check `ReservationCalendar.accept(...)`, raising
+      `OverlappingReservation`.
+- [ ] Properties → reservations: `PropertyCalendarSettingsChanged` carries the code, name, ACTIVE,
+      default times and feeds into the calendar's own copy. A command announces the existing
+      properties.
 - [ ] Events `ReservationImported`, `ReservationRescheduled`, `ReservationCancelled`, `StayEnded`,
       `CalendarEventNeedsReview`, `CalendarFeedFailing`.
 - [ ] `CalendarDiff` domain service: given stored reservations and imported events → list of events
       (new / rescheduled / cancelled). Pure function, heavily unit-tested.
 
 Adapters:
-- [ ] `ICalFetcher` port; `HttpICalFetcher` (httpx, timeout, ETag support) and `FileICalFetcher` (tests).
+- [ ] `ICalFetcher` port; `HttpICalFetcher` (httpx2, timeout, ETag support) and `FileICalFetcher` (tests).
 - [ ] `ICalParser` (library `icalendar`) → `ImportedCalendarEvent`; per-channel classifiers
-      (`AirbnbClassifier`, `BookingClassifier`) deciding reservation vs block vs unknown.
+      (`AirbnbClassifier`, `BookingClassifier`) deciding reservation vs block vs unknown. An unknown
+      event that mirrors another channel's reservation is a block; the admin's answers are
+      remembered by UID.
+- [ ] Admin alerts (feed failing, event to review, overlap) by WhatsApp to `ADMIN_WHATSAPP_NUMBER`
+      through the outbox.
 - [ ] Management command `sync_calendars` (all active properties); scheduled every 30 min.
 - [ ] Feed health (DOMAIN §6): a failed or empty-with-future-reservations sync changes nothing;
       `CalendarFeedFailing` after the alert threshold (configuration, default 2 h) → one admin
@@ -269,7 +277,8 @@ shows everything.
 ## Phase 6 — WhatsApp messaging adapter
 - [ ] `MessageSender` port; `WhatsAppCloudSender` (Graph API, token from env), `ConsoleSender` (dev).
 - [ ] `templates.py`: template names, languages (el, en), parameter order — cleaner daily schedule,
-      schedule changed, admin overload alert, admin issue reported, admin calendar feed failing.
+      schedule changed, admin overload alert, admin issue reported, admin calendar feed failing,
+      admin calendar event to review (unknown or overlapping).
       Script `whatsapp_sync_templates`
       to create/update templates via API (run manually by Petros with his token).
 - [ ] Inbound webhook `/webhooks/whatsapp/`: verify token handshake, validate `X-Hub-Signature-256`,

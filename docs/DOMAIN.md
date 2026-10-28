@@ -45,6 +45,7 @@ tax declarations and the owner portal.
 | Συμβόλαιο | `Contract` | Agreement IKE–owner: commission rate, cleaning charge, terms |
 | Συμβόλαιο προς υπογραφή | `ContractDraft` | The contract PDF and terms the IKE offers for a property; the owner signs it |
 | Κράτηση | `Reservation` | A stay booked on a channel (Airbnb, Booking, direct) |
+| Ημερολόγιο κρατήσεων | `ReservationCalendar` | All reservations of one property, with the state of its calendar feeds |
 | Κανάλι | `Channel` | AIRBNB, BOOKING, DIRECT |
 | Επισκέπτης | `Guest` | Person staying in a property |
 | Οδηγίες check-in | `CheckInGuide` | Location, directions, exterior photo, lockbox photo, lockbox code |
@@ -92,8 +93,9 @@ housekeeping ──IssueApproved────────────────
 guests       ──GuestLinkedToReservation / IdVerified──────▶ compliance (guest data for declaration)
 guests       ──EarlyCheckInAgreed / LateCheckOutAgreed────▶ reservations (update times) ──▶ housekeeping (replan)
 reservations ──StayEnded──────────────────────────────────▶ compliance (DeclarationDue), finance (statement ready)
-properties   ──PropertyActivated──────────────────────────▶ reservations (start iCal sync), owner_portal (ask website consent)
-properties   ──PropertyDeactivated/Reactivated/Offboarded─▶ reservations (stop/resume iCal sync), housekeeping (no new cleanings)
+properties   ──PropertyCalendarSettingsChanged────────────▶ reservations (code, name, ACTIVE or not, default times, feed URLs)
+properties   ──PropertyActivated──────────────────────────▶ owner_portal (ask website consent)
+properties   ──PropertyDeactivated/Reactivated/Offboarded─▶ housekeeping (no new cleanings)
 properties   ──OwnerRegistered────────────────────────────▶ identity (note it on the account that reserved the owner)
 properties   ──OwnerEmailChanged──────────────────────────▶ identity (an invitation not used yet follows the new address)
 ```
@@ -311,7 +313,22 @@ with `/domain-change` if the business wants otherwise.
 
 ## 6. Reservations context
 
-### Aggregate: `Reservation`
+### Aggregate: `ReservationCalendar` (one per property)
+The consistency boundary of the no-overlap rule (Cosmic Python ch. 7). It holds:
+- all reservations of one property;
+- the state of its calendar feeds;
+- the calendar events waiting for the admin.
+
+Other contexts refer to a reservation by `reservation_id`.
+
+It keeps its own copy of what it needs from the properties context (§4.1), kept up to date by
+`PropertyCalendarSettingsChanged`:
+- the property's code and name;
+- whether the property is `ACTIVE`;
+- its default check-in and check-out times;
+- its feed URLs.
+
+### Entity: `Reservation`
 Fields: `id`, `property_id`, `channel`, `external_uid` (iCal UID), `confirmation_code` (optional),
 `check_in_date`, `check_out_date`, `check_in_time`, `check_out_time`, `status`
 (`CONFIRMED`, `CANCELLED`), `guest_name` (optional), `nights` (derived).
@@ -326,18 +343,38 @@ Fields: `id`, `property_id`, `channel`, `external_uid` (iCal UID), `confirmation
 - Advance notice (how late before check-in a booking may be made) is configured on the platforms,
   not enforced here: normally 48 h, at least 24 h. Late bookings are therefore rare, but code must
   not assume it: a later booking is still imported, planned and announced as a schedule change.
+- The dates of an Airbnb or Booking.com reservation come only from its feed. The admin changes its
+  check-in/out times and guest name.
+- A `DIRECT` reservation is entered, changed and cancelled by the admin.
 
 ### iCal sync
-- Each property has one iCal URL per channel. Poll every 30 minutes (configurable).
-- Parse events into `ImportedCalendarEvent(uid, start, end, summary, description)`.
-- Classify: reservation vs owner/manual block. Airbnb typically marks reservations as "Reserved"
-  and blocks as "Not available"; Booking.com feeds may not distinguish. Unclassifiable events become
-  `PendingReview` items for admin confirmation. Classification rules live in the channel adapter.
-- Diff against stored reservations by `external_uid`:
+- Each property has one iCal URL per channel. Poll every 30 minutes (configurable). Only `ACTIVE`
+  properties are synced.
+- Parse events into `ImportedCalendarEvent(uid, start, end, kind, confirmation_code)`.
+  - The channel adapter reads each event's summary and description, to classify it (reservation,
+    block or unknown) and to find the confirmation code.
+  - The summary and description are not kept: an Airbnb description holds digits of the guest's
+    phone.
+- **Classification.** Airbnb typically marks reservations as "Reserved" and blocks as "Not
+  available". Booking.com feeds do not distinguish the two.
+  - An unknown event waits for the admin (`CalendarEventNeedsReview`, with a WhatsApp alert). The
+    admin's answer is remembered by the event's UID.
+  - An unknown event with exactly the dates of a confirmed reservation of another channel is that
+    reservation's mirror, because the platforms' calendars are connected. It is a block.
+  - Classification rules live in the channel adapter.
+- **Changes.** Imported events are compared with the stored reservations by `external_uid`:
   - new → `ReservationImported`
   - dates changed → `ReservationRescheduled(old_dates, new_dates)`
-  - disappeared from feed (and start date in the future) → `ReservationCancelled`
-- The sync is idempotent: running it twice with the same feed produces no events.
+  - disappeared from the feed, with the check-in date after today (in Athens) →
+    `ReservationCancelled`. A stay in progress, or one starting today, is never cancelled by its
+    feed.
+- **Stays that have ended.** A stay whose check-out date is before today never changes from its
+  feed. One first seen after it ended is recorded as ended, with no event.
+- **Overlaps.** A reservation from a feed that would overlap a confirmed one is not saved. It waits
+  as an overlap (`CalendarEventNeedsReview`, with a WhatsApp alert), and is imported once the
+  double booking is resolved on the platforms and the feeds no longer overlap.
+- **Idempotence.** Running the sync twice with the same feed produces no events.
+- **Alerts.** Admin alerts go by WhatsApp to the configured admin number, through the outbox.
 - **Feed health.** A sync of one feed fails when the fetch errors (network, HTTP status, unparseable
   content) or when it returns no events while that feed still has future confirmed reservations.
   A failed sync changes nothing: no reservation is cancelled, rescheduled or added from that feed.
@@ -348,7 +385,17 @@ Fields: `id`, `property_id`, `channel`, `external_uid` (iCal UID), `confirmation
 - An empty feed is accepted only when the admin confirms it (e.g. listing closed, all bookings
   cancelled); its future reservations are then cancelled as usual.
 
-`StayEnded` is raised by a scheduled job on the check-out date.
+`StayEnded` is raised by a scheduled job (12:00 Athens). It is raised once for every confirmed
+stay whose check-out date has come, so a day the job missed is caught up.
+
+### Validation details (Phase 3 — to be confirmed by Petros)
+- **Alert threshold.** A feed's alert fires when it has been failing for at least the threshold,
+  counted from its first failed sync.
+- **Not modified.** A sync that the server answers with "not modified" (ETag) succeeds and changes
+  nothing.
+- **Reappearing UID.** The UID of a cancelled reservation that comes back in the feed is a new
+  reservation.
+- **Event times.** A feed event with a time, not just a date, takes its date in Athens.
 
 ---
 
