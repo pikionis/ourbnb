@@ -3,15 +3,16 @@
 import abc
 from uuid import UUID
 
-from kospm.properties.domain.value_objects import Iban
+from kospm.properties.domain.value_objects import AccountHolderName, Iban
 from kospm.shared.outbox.service_layer.ports import AbstractOutbox
 
 
 class BankAccountVerifier(abc.ABC):
     """Who sends the €0.01 test transfer that verifies an owner's bank account (DOMAIN §5).
 
-    At first the admin sends it by hand from the IKE's e-banking (ManualBankAccountVerifier);
-    later a bank or payment provider does it automatically. Handlers do not change in between.
+    Today the admin sends it by hand from the IKE's e-banking (ManualBankAccountVerifier, ADR
+    0018) and records the bank's payee check; later a business-account API can do both
+    (it needs the holder's name for the check). Handlers do not change in between.
     """
 
     @abc.abstractmethod
@@ -20,7 +21,13 @@ class BankAccountVerifier(abc.ABC):
 
     @abc.abstractmethod
     def request_test_transfer(
-        self, *, owner_id: UUID, iban: Iban, code: str, outbox: AbstractOutbox
+        self,
+        *,
+        owner_id: UUID,
+        iban: Iban,
+        holder_name: AccountHolderName,
+        code: str,
+        outbox: AbstractOutbox,
     ) -> None:
         """Called inside the unit that starts the verification.
 

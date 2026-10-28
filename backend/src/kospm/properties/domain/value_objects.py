@@ -24,6 +24,7 @@ _RATE_STEP = Decimal("0.0001")  # commission rates are stored with 4 decimal pla
 # Uploads are judged by the extension of their storage name (DOMAIN §5, validation details).
 _PHOTO_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp", ".heic")
 _CONTRACT_SUFFIX = ".pdf"
+_MAX_PAYEE_NAME = 70  # the SEPA limit for the name of a payee
 
 
 def _set(instance: object, name: str, value: object) -> None:
@@ -112,6 +113,31 @@ class Iban:
 def _iban_checksum_ok(iban: str) -> bool:
     rearranged = iban[4:] + iban[:4]
     return int("".join(str(int(char, 36)) for char in rearranged)) % 97 == 1
+
+
+@dataclass(frozen=True)
+class AccountHolderName:
+    """The bank account holder's name exactly as the bank holds it (DOMAIN §5, ADR 0018).
+
+    The IKE's bank compares it with the IBAN when the test transfer is sent (Verification of
+    Payee), so it is kept as written: any script, only extra spaces removed.
+    """
+
+    value: str
+
+    def __post_init__(self) -> None:
+        name = " ".join(self.value.split())
+        if not name:
+            raise InvalidValue("the account holder's name is required", field="holder_name")
+        if len(name) > _MAX_PAYEE_NAME:
+            raise InvalidValue(
+                f"an account holder's name has at most {_MAX_PAYEE_NAME} characters",
+                field="holder_name",
+            )
+        _set(self, "value", name)
+
+    def __str__(self) -> str:
+        return self.value
 
 
 @dataclass(frozen=True)

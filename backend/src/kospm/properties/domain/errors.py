@@ -77,6 +77,22 @@ class BankVerificationNotStarted(DomainError):
     """A code was entered, but no test transfer is waiting for one."""
 
 
+class TransferNotSentYet(DomainError):
+    """A code was entered before the IKE recorded the test transfer as sent (ADR 0018)."""
+
+
+class ChangeThroughTheIke(DomainError):
+    """The owner may not change this in the portal; the IKE changes it (DOMAIN §5, owner portal).
+
+    `item` names what: "bank_account" (verified already), "email" (the login), "property" (no
+    longer onboarding).
+    """
+
+    def __init__(self, item: str) -> None:
+        self.item = item
+        super().__init__(f"the owner changes the {item} through the IKE")
+
+
 class BankAccountAlreadyVerified(DomainError):
     """The bank account is verified already; change the IBAN to verify another one."""
 

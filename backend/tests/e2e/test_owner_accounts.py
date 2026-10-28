@@ -2,25 +2,29 @@
 and the outbox. Links are taken from the emails waiting in the outbox, as an owner would click
 them."""
 
-import re
 from typing import Any
 
 import pytest
-from django.contrib.messages import get_messages
 from django.core.cache import cache
 from django.test import Client
 from django.urls import reverse
 
 from kospm.identity.models import User
-from kospm.properties import models as properties_models
-from kospm.shared.outbox.models import OutboxMessage
-from tests.unit.properties.builders import VALID_AFM, VALID_IBAN
+from tests.e2e.owners import (
+    MARIA,
+    PASSWORD,
+    choose_password,
+    confirm,
+    emails_to,
+    invite,
+    link_in,
+    log_in,
+    open_link,
+    register_owner_in_admin,
+    sign_up,
+)
 
 pytestmark = pytest.mark.django_db
-
-MARIA = "maria@example.com"
-PASSWORD = "a long passphrase 4 Kos"
-LINK = re.compile(r"https://portal\.test(/owner/\S+/)")
 
 
 @pytest.fixture(autouse=True)
@@ -28,82 +32,9 @@ def fresh_throttle() -> None:
     cache.clear()  # throttling counts live in the cache, which outlives a test
 
 
-def emails_to(address: str) -> list[OutboxMessage]:
-    return list(OutboxMessage.objects.filter(recipient=address).order_by("created_at"))
-
-
-def link_in(message: OutboxMessage) -> str:
-    match = LINK.search(message.payload["body"])
-    assert match is not None, message.payload["body"]
-    return match.group(1)
-
-
-def open_link(client: Client, link: str) -> str:
-    """Click an emailed link: the page keeps its token and moves to a URL without it."""
-    response = client.get(link)
-    assert response.status_code == 302
-    page: str = response["Location"]
-    assert "continue" in page
-    return page
-
-
-def confirm(client: Client, message: OutboxMessage) -> Any:
-    page = open_link(client, link_in(message))
-    assert client.get(page).status_code == 200
-    return client.post(page)
-
-
-def choose_password(client: Client, message: OutboxMessage, password: str = PASSWORD) -> Any:
-    page = open_link(client, link_in(message))
-    assert client.get(page).status_code == 200
-    return client.post(page, {"password1": password, "password2": password})
-
-
-def messages_of(response: Any) -> list[str]:
-    return [str(message) for message in get_messages(response.wsgi_request)]
-
-
-def sign_up(client: Client, email: str = MARIA, password: str = PASSWORD) -> Any:
-    return client.post(
-        reverse("identity:signup"),
-        {"email": email, "password1": password, "password2": password},
-    )
-
-
 def signed_up_and_confirmed(client: Client) -> None:
     sign_up(client)
     confirm(client, emails_to(MARIA)[0])
-
-
-def log_in(client: Client, email: str = MARIA, password: str = PASSWORD) -> Any:
-    return client.post(reverse("identity:login"), {"username": email, "password": password})
-
-
-def register_owner_in_admin(admin_client: Client, email: str = MARIA) -> properties_models.Owner:
-    added = admin_client.post(
-        reverse("admin:properties_owner_add"),
-        {
-            "name": "Μαρία Παπαδοπούλου",
-            "email": email,
-            "phone": "+30 6900000000",
-            "afm": VALID_AFM,
-            "iban": VALID_IBAN,
-            "properties-TOTAL_FORMS": "0",
-            "properties-INITIAL_FORMS": "0",
-            "properties-MIN_NUM_FORMS": "0",
-            "properties-MAX_NUM_FORMS": "0",
-        },
-    )
-    assert added.status_code == 302
-    return properties_models.Owner.objects.get(email=email)
-
-
-def invite(admin_client: Client, owner: properties_models.Owner) -> list[str]:
-    response = admin_client.post(
-        reverse("admin:properties_owner_changelist"),
-        {"action": "invite_to_portal", "_selected_action": [str(owner.pk)]},
-    )
-    return messages_of(response)
 
 
 class TestSignUp:

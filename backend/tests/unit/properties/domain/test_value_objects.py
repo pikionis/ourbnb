@@ -8,6 +8,7 @@ import pytest
 
 from kospm.properties.domain.errors import InvalidValue
 from kospm.properties.domain.value_objects import (
+    AccountHolderName,
     Afm,
     Amenities,
     Contract,
@@ -26,6 +27,18 @@ from tests.unit.properties.builders import (
     complete_guide,
     signed_contract,
 )
+
+
+class TestAccountHolderName:
+    def test_keeps_the_banks_spelling_without_extra_spaces(self) -> None:
+        assert AccountHolderName("  PAPADOPOULOU   MARIA ").value == "PAPADOPOULOU MARIA"
+        assert AccountHolderName("Μαρία Παπαδοπούλου").value == "Μαρία Παπαδοπούλου"
+
+    @pytest.mark.parametrize("raw", ["", "   ", "A" * 71])
+    def test_is_required_and_fits_a_sepa_payee_name(self, raw: str) -> None:
+        with pytest.raises(InvalidValue) as refused:
+            AccountHolderName(raw)
+        assert refused.value.field == "holder_name"
 
 
 class TestPropertyCode:

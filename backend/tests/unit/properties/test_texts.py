@@ -44,3 +44,16 @@ def test_a_refused_value_is_described_in_the_reader_s_language(
 
 def test_a_field_without_a_message_keeps_the_domain_s_text() -> None:
     assert describe(InvalidValue("something new", field="unknown")) == "something new"
+
+
+def test_every_state_has_a_badge_colour_and_an_owner_facing_text() -> None:
+    from kospm.properties import models
+    from kospm.properties.domain.owner import BankAccountStatus
+    from kospm.properties.entrypoints.admin import BANK_COLOURS, STATUS_COLOURS
+    from kospm.properties.entrypoints.portal.texts import BANK_STATUS
+
+    assert set(BANK_COLOURS) == set(models.BankAccountStatusChoices)
+    assert set(STATUS_COLOURS) == set(models.PropertyStatusChoices)
+    assert set(BANK_STATUS) == set(BankAccountStatus)
+    stored = {choice.value for choice in models.BankAccountStatusChoices}
+    assert stored == {status.value for status in BankAccountStatus}

@@ -16,12 +16,13 @@ from kospm.properties.domain.checklist import ActivationRequirement
 from kospm.properties.domain.commands import (
     ActivateProperty,
     AssignAma,
-    ChangeOwnerIban,
+    ChangeBankAccount,
     ConfirmBankAccount,
     CreateProperty,
     DeactivateProperty,
     OffboardProperty,
     RecordSubleaseDeclaration,
+    RecordTestTransfer,
     RegisterOwner,
     SignContract,
     StartBankAccountVerification,
@@ -31,23 +32,32 @@ from kospm.properties.domain.commands import (
 from kospm.properties.domain.defaults import BankVerificationPolicy, PropertyDefaults
 from kospm.properties.domain.errors import (
     BankAccountAlreadyVerified,
+    ChangeThroughTheIke,
     InvalidValue,
     OwnerAlreadyRegistered,
     OwnerNotFound,
     PropertyCodeTaken,
     PropertyNotFound,
     PropertyNotReadyForActivation,
+    TransferNotSentYet,
     WrongVerificationCode,
 )
 from kospm.properties.domain.events import OwnerEmailChanged
 from kospm.properties.domain.owner import BankAccountStatus
 from kospm.properties.domain.property import PropertyStatus
-from kospm.properties.domain.value_objects import Email, Iban, IcalChannel, PropertyCode
+from kospm.properties.domain.value_objects import (
+    AccountHolderName,
+    Email,
+    Iban,
+    IcalChannel,
+    PropertyCode,
+)
 from kospm.properties.service_layer.handlers import COMMAND_HANDLERS, EVENT_HANDLERS
 from kospm.shared.clock import FixedClock
 from kospm.shared.domain import Money, new_id
 from kospm.shared.messagebus import MessageBus
 from tests.unit.properties.builders import (
+    HOLDER,
     OTHER_VALID_AFM,
     OTHER_VALID_IBAN,
     VALID_AFM,
@@ -99,6 +109,7 @@ class Harness:
                 phone="+30 6900000000",
                 afm=afm,
                 iban=VALID_IBAN,
+                holder_name="PAPADOPOULOU MARIA",
             )
         )
         return owner_id
@@ -140,8 +151,12 @@ class Harness:
         self.bus.handle(RecordSubleaseDeclaration(property_id=property_id, number="ΔΥ-123"))
         self.bus.handle(AssignAma(property_id=property_id, ama_number="00001234567"))
 
-    def verify_bank_account(self, owner_id: UUID) -> None:
+    def send_test_transfer(self, owner_id: UUID, result: str = "match") -> None:
         self.bus.handle(StartBankAccountVerification(owner_id=owner_id))
+        self.bus.handle(RecordTestTransfer(owner_id=owner_id, result=result))
+
+    def verify_bank_account(self, owner_id: UUID) -> None:
+        self.send_test_transfer(owner_id)
         code = self.owner(owner_id).bank_account.verification_code
         self.bus.handle(ConfirmBankAccount(owner_id=owner_id, code=code))
 
@@ -196,7 +211,9 @@ class TestOwners:
     def test_a_new_iban_must_be_verified_again(self, harness: Harness) -> None:
         owner_id = harness.register_owner()
         harness.verify_bank_account(owner_id)
-        harness.bus.handle(ChangeOwnerIban(owner_id=owner_id, iban=OTHER_VALID_IBAN))
+        harness.bus.handle(
+            ChangeBankAccount(owner_id=owner_id, iban=OTHER_VALID_IBAN, holder_name="MARIA P")
+        )
         account = harness.owner(owner_id).bank_account
         assert (account.iban, account.status) == (
             Iban(OTHER_VALID_IBAN),
@@ -227,7 +244,7 @@ class TestBankAccountVerification:
             "123456",
         )
         assert harness.verifier.transfers == [
-            RequestedTransfer(owner_id, Iban(VALID_IBAN), "123456")
+            RequestedTransfer(owner_id, Iban(VALID_IBAN), HOLDER, "123456")
         ]
 
     def test_no_transfer_for_a_verified_account(self, harness: Harness) -> None:
@@ -240,9 +257,40 @@ class TestBankAccountVerification:
     def test_the_code_stays_out_of_the_command_repr(self) -> None:
         assert "987654" not in repr(ConfirmBankAccount(owner_id=new_id(), code="987654"))
 
-    def test_a_wrong_code_is_reported_after_the_attempt_is_saved(self, harness: Harness) -> None:
+    def test_the_admin_records_the_transfer_with_the_banks_payee_check(
+        self, harness: Harness
+    ) -> None:
         owner_id = harness.register_owner()
         harness.bus.handle(StartBankAccountVerification(owner_id=owner_id))
+        harness.bus.handle(
+            RecordTestTransfer(owner_id=owner_id, result="close_match", bank_name="PAPADOPOULOU M")
+        )
+        account = harness.owner(owner_id).bank_account
+        assert account.status is BankAccountStatus.TRANSFER_SENT
+        assert account.holder_name == AccountHolderName("PAPADOPOULOU M")
+
+    @pytest.mark.parametrize(
+        ("result", "bank_name"), [("close_match", ""), ("maybe", ""), ("match", "X")]
+    )
+    def test_a_check_must_be_one_of_the_banks_answers(
+        self, harness: Harness, result: str, bank_name: str
+    ) -> None:
+        owner_id = harness.register_owner()
+        harness.bus.handle(StartBankAccountVerification(owner_id=owner_id))
+        with pytest.raises(InvalidValue):
+            harness.bus.handle(
+                RecordTestTransfer(owner_id=owner_id, result=result, bank_name=bank_name)
+            )
+
+    def test_no_code_before_the_transfer_is_sent(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        harness.bus.handle(StartBankAccountVerification(owner_id=owner_id))
+        with pytest.raises(TransferNotSentYet):
+            harness.bus.handle(ConfirmBankAccount(owner_id=owner_id, code="123456"))
+
+    def test_a_wrong_code_is_reported_after_the_attempt_is_saved(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        harness.send_test_transfer(owner_id)
         commits_before = harness.uow.committed
         with pytest.raises(WrongVerificationCode) as wrong:
             harness.bus.handle(ConfirmBankAccount(owner_id=owner_id, code="000000"))
@@ -253,6 +301,64 @@ class TestBankAccountVerification:
     def test_the_right_code_verifies_the_account(self, harness: Harness) -> None:
         owner_id = harness.register_owner()
         harness.verify_bank_account(owner_id)
+        assert harness.owner(owner_id).bank_account_verified is True
+
+
+class TestOwnerPortalRules:
+    """Commands from the owner portal name the acting owner (ADR 0017, DOMAIN §5)."""
+
+    def test_an_owner_acts_only_on_their_own_data(self, harness: Harness) -> None:
+        maria = harness.register_owner()
+        nikos = harness.register_owner(afm=OTHER_VALID_AFM, email="nikos@example.com")
+        with pytest.raises(OwnerNotFound):
+            harness.bus.handle(StartBankAccountVerification(owner_id=maria, acting_owner_id=nikos))
+        with pytest.raises(OwnerNotFound):
+            harness.bus.handle(
+                ChangeBankAccount(
+                    owner_id=maria,
+                    iban=OTHER_VALID_IBAN,
+                    holder_name="NIKOS",
+                    acting_owner_id=nikos,
+                )
+            )
+        assert harness.owner(maria).bank_account.iban == Iban(VALID_IBAN)
+
+    def test_an_owner_changes_their_bank_account_only_until_it_is_verified(
+        self, harness: Harness
+    ) -> None:
+        owner_id = harness.register_owner()
+
+        def change_to(iban: str) -> ChangeBankAccount:
+            return ChangeBankAccount(
+                owner_id=owner_id, iban=iban, holder_name="MARIA P", acting_owner_id=owner_id
+            )
+
+        harness.bus.handle(change_to(OTHER_VALID_IBAN))
+        harness.verify_bank_account(owner_id)
+        with pytest.raises(ChangeThroughTheIke):
+            harness.bus.handle(change_to(VALID_IBAN))
+        assert harness.owner(owner_id).bank_account_verified is True
+
+    def test_an_owner_does_not_change_their_login_email(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+
+        def details_with(email: str) -> UpdateOwnerDetails:
+            return UpdateOwnerDetails(
+                owner_id=owner_id, name="Μαρία Π.", email=email, phone="1", acting_owner_id=owner_id
+            )
+
+        harness.bus.handle(details_with("maria@example.com"))
+        with pytest.raises(ChangeThroughTheIke):
+            harness.bus.handle(details_with("other@example.com"))
+        assert harness.owner(owner_id).name == "Μαρία Π."
+
+    def test_an_owner_enters_their_own_code(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        harness.send_test_transfer(owner_id)
+        code = harness.owner(owner_id).bank_account.verification_code
+        harness.bus.handle(
+            ConfirmBankAccount(owner_id=owner_id, code=code, acting_owner_id=owner_id)
+        )
         assert harness.owner(owner_id).bank_account_verified is True
 
 
@@ -404,7 +510,9 @@ class TestFormVersions:
             )
         )
         harness.bus.handle(
-            ChangeOwnerIban(owner_id=owner_id, iban=OTHER_VALID_IBAN, expected_version=8)
+            ChangeBankAccount(
+                owner_id=owner_id, iban=OTHER_VALID_IBAN, holder_name="M", expected_version=8
+            )
         )
         assert harness.uow.owners.expected_versions[-2:] == [7, 8]
 

@@ -39,6 +39,7 @@ from kospm.properties.domain.commands import (
 from kospm.properties.domain.errors import InvalidValue
 from kospm.properties.domain.property import Property
 from kospm.properties.domain.value_objects import (
+    AccountHolderName,
     Afm,
     Email,
     Iban,
@@ -90,6 +91,18 @@ def _version_field() -> forms.IntegerField:
 
 
 class OwnerForm(forms.ModelForm[models.Owner]):
+    payee_check = forms.ChoiceField(
+        label=_("test transfer sent: the bank's payee check"),
+        required=False,
+        choices=[("", "—"), *models.PayeeCheckChoices.choices],
+        help_text=_("What e-banking answered when you sent the €0.01 (ADR 0018)."),
+    )
+    payee_check_name = forms.CharField(
+        label=_("name returned by the bank"),
+        required=False,
+        max_length=70,
+        help_text=_("Only for “the name almost matches”: the bank's spelling of the name."),
+    )
     verification_code = forms.CharField(
         label=_("code of the test transfer"),
         required=False,
@@ -100,7 +113,7 @@ class OwnerForm(forms.ModelForm[models.Owner]):
 
     class Meta:
         model = models.Owner
-        fields = ("name", "email", "phone", "afm", "iban")
+        fields = ("name", "email", "phone", "afm", "iban", "bank_holder_name")
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -114,6 +127,9 @@ class OwnerForm(forms.ModelForm[models.Owner]):
 
     def clean_iban(self) -> str:
         return _checked(lambda: Iban(self.cleaned_data["iban"]).value)
+
+    def clean_bank_holder_name(self) -> str:
+        return _checked(lambda: AccountHolderName(self.cleaned_data["bank_holder_name"]).value)
 
 
 class PropertyForm(forms.ModelForm[models.Property]):

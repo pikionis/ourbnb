@@ -1,0 +1,52 @@
+{% extends "portal/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Bank account" %}{% endblock %}
+{% block content %}
+  <p><a href="{% url 'portal:dashboard' %}">‹ {% translate "Home" %}</a></p>
+  <h1>{% translate "Bank account" %}</h1>
+  <p class="lead">{% translate "We pay you here. To be sure the account is yours, we send it €0.01 with a 6-digit code in the reference; you type the code here." %}</p>
+
+  <section class="card">
+    <p class="readonly-value">{{ bank.iban }}</p>
+    <p>{% translate "Account holder:" %} {{ bank.holder_name }}</p>
+    <p class="state-text"><strong>{{ bank_status }}</strong></p>
+  </section>
+
+  {% if payee_check_refused %}
+    <p class="alert alert-warning" role="alert">{{ payee_check_refused_text }}</p>
+  {% endif %}
+
+  {% if bank.status == "transfer_sent" or code_form.errors %}
+    <h2>{% translate "Enter the code" %}</h2>
+    <p>{% translate "Look at the €0.01 transfer on your statement: the code is in its reference. It may take 1–2 working days to appear." %}</p>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="code">
+      {% include "portal/form.html" with form=code_form %}
+      <button type="submit" class="button">{% translate "Confirm" %}</button>
+    </form>
+  {% elif bank.status == "pending" %}
+    <p class="alert alert-info">{% translate "We will send you the €0.01 test transfer soon. Come back here when you see it on your statement." %}</p>
+  {% elif bank.status == "unverified" %}
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="verify">
+      <button type="submit" class="button">{% translate "Verify my bank account" %}</button>
+    </form>
+  {% endif %}
+
+  {% if editable %}
+    <h2>{% translate "Change the account" %}</h2>
+    {% if bank.status != "unverified" %}
+      <p class="fine-print">{% translate "A different account or name must be verified again: the transfer on its way is cancelled." %}</p>
+    {% endif %}
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="account">
+      {% include "portal/form.html" with form=account_form %}
+      <button type="submit" class="button button-secondary">{% translate "Save the account" %}</button>
+    </form>
+  {% else %}
+    <p class="fine-print">{% translate "Your bank account is verified: to change it, contact us. This protects your payouts." %}</p>
+  {% endif %}
+{% endblock %}

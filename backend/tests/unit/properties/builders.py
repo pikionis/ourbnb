@@ -12,6 +12,7 @@ from kospm.properties.domain.defaults import PropertyDefaults
 from kospm.properties.domain.owner import Owner
 from kospm.properties.domain.property import Property
 from kospm.properties.domain.value_objects import (
+    AccountHolderName,
     Afm,
     Amenities,
     CheckInGuide,
@@ -29,6 +30,7 @@ VALID_AFM = "090000045"
 OTHER_VALID_AFM = "123456783"
 VALID_IBAN = "GR16 0110 1250 0000 0001 2300 695"
 OTHER_VALID_IBAN = "DE89 3704 0044 0532 0130 00"
+HOLDER = AccountHolderName("PAPADOPOULOU MARIA")
 KOS_TOWN = GeoPoint(lat=Decimal("36.893300"), lng=Decimal("27.288900"))
 SIGNED_AT = datetime(2026, 10, 20, 9, 30, tzinfo=UTC)
 
@@ -43,6 +45,7 @@ def owner(
         phone="+30 6900000000",
         afm=Afm(afm),
         iban=Iban(VALID_IBAN),
+        holder_name=HOLDER,
     )
     registered.events.clear()
     return registered

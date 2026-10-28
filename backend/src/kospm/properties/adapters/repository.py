@@ -17,9 +17,16 @@ from kospm.properties.domain.errors import (
     PropertyCodeTaken,
     PropertyNotFound,
 )
-from kospm.properties.domain.owner import BankAccount, BankAccountStatus, Owner
+from kospm.properties.domain.owner import (
+    BankAccount,
+    BankAccountStatus,
+    Owner,
+    PayeeCheck,
+    PayeeCheckResult,
+)
 from kospm.properties.domain.property import Property, PropertyStatus
 from kospm.properties.domain.value_objects import (
+    AccountHolderName,
     Afm,
     Amenities,
     CheckInGuide,
@@ -50,23 +57,39 @@ def owner_to_domain(row: models.Owner) -> Owner:
         afm=Afm(row.afm),
         bank_account=BankAccount(
             Iban(row.iban),
+            AccountHolderName(row.bank_holder_name),
             status=BankAccountStatus(row.bank_account_status),
             verification_code=row.bank_verification_code,
             failed_attempts=row.bank_verification_failed_attempts,
+            payee_check=_payee_check(row),
         ),
         show_on_website=row.show_on_website,
         website_consent_requested=row.website_consent_requested,
     )
 
 
+def _payee_check(row: models.Owner) -> PayeeCheck | None:
+    if not row.bank_payee_check:
+        return None
+    bank_name = row.bank_payee_check_name
+    return PayeeCheck(
+        PayeeCheckResult(row.bank_payee_check),
+        AccountHolderName(bank_name) if bank_name else None,
+    )
+
+
 def owner_values(owner: Owner) -> dict[str, Any]:
     account = owner.bank_account
+    check = account.payee_check
     return {
         "name": owner.name,
         "email": owner.email.value,
         "phone": owner.phone,
         "afm": owner.afm.value,
         "iban": account.iban.value,
+        "bank_holder_name": account.holder_name.value,
+        "bank_payee_check": check.result.value if check else "",
+        "bank_payee_check_name": check.bank_name.value if check and check.bank_name else "",
         "bank_account_status": account.status.value,
         "bank_verification_code": account.verification_code,
         "bank_verification_failed_attempts": account.failed_attempts,

@@ -13,8 +13,18 @@ from kospm.shared.adapters.fields import EncryptedTextField
 
 class BankAccountStatusChoices(models.TextChoices):
     UNVERIFIED = "unverified", _("Unverified")
-    PENDING = "pending", _("Waiting for the code")
+    PENDING = "pending", _("Waiting for the test transfer")
+    TRANSFER_SENT = "transfer_sent", _("Transfer sent, waiting for the code")
     VERIFIED = "verified", _("Verified")
+
+
+class PayeeCheckChoices(models.TextChoices):
+    """The bank's Verification of Payee answer when the test transfer is sent (ADR 0018)."""
+
+    MATCH = "match", _("The name matches")
+    CLOSE_MATCH = "close_match", _("The name almost matches")
+    NOT_POSSIBLE = "not_possible", _("The check was not possible")
+    NO_MATCH = "no_match", _("The name does not match (not sent)")
 
 
 class PropertyStatusChoices(models.TextChoices):
@@ -31,6 +41,13 @@ class Owner(models.Model):
     phone = models.CharField(_("phone"), max_length=32)
     afm = models.CharField(_("tax number (AFM)"), max_length=9, unique=True)
     iban = models.CharField(_("IBAN"), max_length=34)
+    bank_holder_name = models.CharField(_("account holder"), max_length=70)
+    bank_payee_check = models.CharField(
+        _("payee check"), max_length=16, choices=PayeeCheckChoices.choices, blank=True
+    )
+    bank_payee_check_name = models.CharField(
+        _("name returned by the bank"), max_length=70, blank=True
+    )
     bank_account_status = models.CharField(
         _("bank account"),
         max_length=16,

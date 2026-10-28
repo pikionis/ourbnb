@@ -136,7 +136,7 @@ DEFAULT_FROM_EMAIL = env.str("DEFAULT_FROM_EMAIL", default="KosPM <noreply@local
 AUTH_USER_MODEL = "identity.User"
 LOGIN_URL = "identity:login"
 # The owner's dashboard (Phase 2b, properties portal pages).
-LOGIN_REDIRECT_URL = "/owner/"
+LOGIN_REDIRECT_URL = "portal:dashboard"
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

@@ -48,6 +48,7 @@ def owner_form(**overrides: Any) -> dict[str, Any]:
         "phone": "+30 6900000000",
         "afm": VALID_AFM,
         "iban": VALID_IBAN,
+        "bank_holder_name": "PAPADOPOULOU MARIA",
         "properties-TOTAL_FORMS": "0",
         "properties-INITIAL_FORMS": "0",
         "properties-MIN_NUM_FORMS": "0",
@@ -135,7 +136,7 @@ def verify_bank_account(client: Client, owner: models.Owner) -> None:
     owner.refresh_from_db()
     response = client.post(
         reverse("admin:properties_owner_change", args=[owner.pk]),
-        owner_form(verification_code=owner.bank_verification_code),
+        owner_form(payee_check="match", verification_code=owner.bank_verification_code),
     )
     assert response.status_code == 302
 
@@ -175,14 +176,43 @@ class TestOwners:
         assert any(owner.bank_verification_code in m for m in messages_of(started))
 
         change = reverse("admin:properties_owner_change", args=[owner.pk])
-        wrong = admin_client.post(change, owner_form(verification_code="000000"), follow=True)
+        too_early = admin_client.post(change, owner_form(verification_code="000000"), follow=True)
+        assert any("δεν έχει σταλεί" in m for m in messages_of(too_early))
+
+        bank_name = "PAPADOPOULOU MARIA K"
+        sent = admin_client.post(
+            change,
+            owner_form(payee_check="close_match", payee_check_name=bank_name),
+            follow=True,
+        )
+        owner.refresh_from_db()
+        assert owner.bank_account_status == "transfer_sent"
+        assert owner.bank_holder_name == bank_name  # the bank's own spelling
+        assert sent.status_code == 200
+
+        wrong = admin_client.post(
+            change, owner_form(bank_holder_name=bank_name, verification_code="000000"), follow=True
+        )
         owner.refresh_from_db()
         assert owner.bank_verification_failed_attempts == 1
         assert any("000000" not in m and "2" in m for m in messages_of(wrong))
 
-        admin_client.post(change, owner_form(verification_code=owner.bank_verification_code))
+        admin_client.post(
+            change,
+            owner_form(bank_holder_name=bank_name, verification_code=owner.bank_verification_code),
+        )
         owner.refresh_from_db()
         assert owner.bank_account_status == "verified"
+
+    def test_no_match_sends_nothing_and_the_verification_starts_over(
+        self, admin_client: Client
+    ) -> None:
+        owner = add_owner(admin_client)
+        run_action(admin_client, OWNERS, "start_bank_verification", owner.pk)
+        change = reverse("admin:properties_owner_change", args=[owner.pk])
+        admin_client.post(change, owner_form(payee_check="no_match"))
+        owner.refresh_from_db()
+        assert (owner.bank_account_status, owner.bank_payee_check) == ("unverified", "no_match")
 
 
 class TestProperties:

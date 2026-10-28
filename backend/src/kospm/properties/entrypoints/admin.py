@@ -26,10 +26,11 @@ from kospm.properties import models
 from kospm.properties.adapters.queries import missing_for_activation, profile_gaps
 from kospm.properties.domain.commands import (
     ActivateProperty,
-    ChangeOwnerIban,
+    ChangeBankAccount,
     ConfirmBankAccount,
     DeactivateProperty,
     OffboardProperty,
+    RecordTestTransfer,
     RegisterOwner,
     StartBankAccountVerification,
     UpdateOwnerDetails,
@@ -52,6 +53,7 @@ STATUS_COLOURS = {
 BANK_COLOURS = {
     models.BankAccountStatusChoices.UNVERIFIED: "#b45309",
     models.BankAccountStatusChoices.PENDING: "#1d4ed8",
+    models.BankAccountStatusChoices.TRANSFER_SENT: "#1d4ed8",
     models.BankAccountStatusChoices.VERIFIED: "#15803d",
 }
 
@@ -134,6 +136,8 @@ class OwnerAdmin(CommandModelAdmin[models.Owner]):
     form = OwnerForm
     list_display = ("name", "email", "afm", "bank_account_badge", "property_count")
     search_fields = ("name", "email", "afm")
+    # "Waiting for the test transfer" is the admin's to-do list (ADR 0018).
+    list_filter = ("bank_account_status",)
     inlines = (PropertyInline,)
     actions = ("start_bank_verification", "invite_to_portal")
 
@@ -141,12 +145,24 @@ class OwnerAdmin(CommandModelAdmin[models.Owner]):
         self, request: HttpRequest, obj: models.Owner | None = None
     ) -> "_FieldsetSpec":
         if obj is None:
-            return [(None, {"fields": ("name", "email", "phone", "afm", "iban")})]
+            return [
+                (None, {"fields": ("name", "email", "phone", "afm", "iban", "bank_holder_name")})
+            ]
         return [
             (None, {"fields": ("name", "email", "phone", "afm", "version")}),
             (
                 _("Bank account"),
-                {"fields": ("iban", "bank_account_badge", "bank_transfer", "verification_code")},
+                {
+                    "fields": (
+                        "iban",
+                        "bank_holder_name",
+                        "bank_account_badge",
+                        "bank_transfer",
+                        "payee_check",
+                        "payee_check_name",
+                        "verification_code",
+                    )
+                },
             ),
             (_("Public website"), {"fields": ("show_on_website", "website_consent_requested")}),
         ]
@@ -178,6 +194,7 @@ class OwnerAdmin(CommandModelAdmin[models.Owner]):
                     phone=data["phone"],
                     afm=data["afm"],
                     iban=data["iban"],
+                    holder_name=data["bank_holder_name"],
                 )
             )
             return
@@ -195,22 +212,42 @@ class OwnerAdmin(CommandModelAdmin[models.Owner]):
                 )
             )
             version = None
-        if "iban" in form.changed_data:
+        if {"iban", "bank_holder_name"} & set(form.changed_data):
             commands.append(
-                ChangeOwnerIban(owner_id=obj.pk, iban=data["iban"], expected_version=version)
+                ChangeBankAccount(
+                    owner_id=obj.pk,
+                    iban=data["iban"],
+                    holder_name=data["bank_holder_name"],
+                    expected_version=version,
+                )
             )
         send_or_refuse(*commands)
+        if data.get("payee_check"):
+            self._send_reported(
+                request,
+                RecordTestTransfer(
+                    owner_id=obj.pk,
+                    result=data["payee_check"],
+                    bank_name=data.get("payee_check_name", ""),
+                ),
+                _("The test transfer is recorded."),
+            )
         if data.get("verification_code"):
-            self._confirm_bank_account(request, obj, data["verification_code"])
-
-    def _confirm_bank_account(self, request: HttpRequest, obj: models.Owner, code: str) -> None:
-        try:
-            send(ConfirmBankAccount(owner_id=obj.pk, code=code))
-        except (DomainError, ConcurrencyError) as error:
             # Not a refusal of the save: a wrong attempt is recorded and must stay recorded.
+            self._send_reported(
+                request,
+                ConfirmBankAccount(owner_id=obj.pk, code=data["verification_code"]),
+                _("The bank account is verified."),
+            )
+
+    def _send_reported(self, request: HttpRequest, command: Command, done: str) -> None:
+        """A step of the bank verification, in its own unit: its refusal is reported."""
+        try:
+            send(command)
+        except (DomainError, ConcurrencyError) as error:
             self.message_user(request, describe(error), messages.WARNING)
         else:
-            self.message_user(request, _("The bank account is verified."), messages.SUCCESS)
+            self.message_user(request, done, messages.SUCCESS)
 
     @admin.action(description=gettext_lazy("Start the bank account verification (test transfer)"))
     def start_bank_verification(
@@ -258,9 +295,11 @@ class OwnerAdmin(CommandModelAdmin[models.Owner]):
 
     @admin.display(description=gettext_lazy("test transfer"))
     def bank_transfer(self, obj: models.Owner) -> str:
-        if obj.bank_account_status != models.BankAccountStatusChoices.PENDING:
-            return "—"
-        return self._transfer_instructions(obj)
+        if obj.bank_account_status == models.BankAccountStatusChoices.PENDING:
+            return self._transfer_instructions(obj)
+        if obj.bank_account_status == models.BankAccountStatusChoices.TRANSFER_SENT:
+            return _("Sent; the owner enters the code they read on their statement.")
+        return "—"
 
     @admin.display(description=gettext_lazy("properties"))
     def property_count(self, obj: models.Owner) -> int:
@@ -269,11 +308,12 @@ class OwnerAdmin(CommandModelAdmin[models.Owner]):
     @staticmethod
     def _transfer_instructions(owner: models.Owner) -> str:
         return _(
-            "%(name)s: send €0.01 to %(iban)s with reference %(code)s, then enter the code the "
-            "owner reads on their statement."
+            "%(name)s: send €0.01 to %(iban)s, payee %(holder)s, with reference %(code)s. Then "
+            "record below what the bank's payee check answered."
         ) % {
             "name": owner.name,
             "iban": Iban(owner.iban).formatted(),
+            "holder": owner.bank_holder_name,
             "code": owner.bank_verification_code,
         }
 

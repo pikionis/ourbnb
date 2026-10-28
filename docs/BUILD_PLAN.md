@@ -153,8 +153,8 @@ Owners register and complete the checklist themselves (DOMAIN §5). Design brief
 - [x] Owner registration and login (email + password via Django auth, email verification, password
       reset, invitation of owners registered by the admin); an owner account is linked to one
       `Owner`. Emails through the outbox (`DjangoEmailSender`); login, sign-up and reset throttled.
-- [ ] Portal shell (layout, language toggle, owner-scoped access) and the checklist dashboard.
-- [ ] Owner details (step 1) and bank account: holder name, `PENDING → TRANSFER_SENT → VERIFIED`
+- [x] Portal shell (layout, language toggle, owner-scoped access) and the checklist dashboard.
+- [x] Owner details (step 1) and bank account: holder name, `PENDING → TRANSFER_SENT → VERIFIED`
       with the payee check recorded by the admin; IBAN locked in the portal once verified.
 - [ ] Properties: add (code assigned automatically), profile form with photo uploads, files served
       only to their owner; owner edits only while `ONBOARDING`.

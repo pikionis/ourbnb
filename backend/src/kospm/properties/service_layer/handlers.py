@@ -14,16 +14,18 @@ from collections.abc import Callable
 from datetime import datetime
 from decimal import Decimal
 from typing import assert_never
+from uuid import UUID
 
 from kospm.properties.domain.commands import (
     ActivateProperty,
     AssignAma,
-    ChangeOwnerIban,
+    ChangeBankAccount,
     ConfirmBankAccount,
     CreateProperty,
     DeactivateProperty,
     OffboardProperty,
     RecordSubleaseDeclaration,
+    RecordTestTransfer,
     RegisterOwner,
     SignContract,
     StartBankAccountVerification,
@@ -32,15 +34,18 @@ from kospm.properties.domain.commands import (
 )
 from kospm.properties.domain.defaults import BankVerificationPolicy, PropertyDefaults
 from kospm.properties.domain.errors import (
+    ChangeThroughTheIke,
     InvalidValue,
     OwnerAlreadyRegistered,
+    OwnerNotFound,
     PropertyCodeTaken,
     WrongVerificationCode,
 )
 from kospm.properties.domain.events import PropertyActivated
-from kospm.properties.domain.owner import Owner
+from kospm.properties.domain.owner import Owner, PayeeCheck, PayeeCheckResult
 from kospm.properties.domain.property import Property
 from kospm.properties.domain.value_objects import (
+    AccountHolderName,
     Afm,
     Amenities,
     CheckInGuide,
@@ -62,6 +67,7 @@ from kospm.shared.domain import Command, DomainEvent, Money
 
 def register_owner(cmd: RegisterOwner, uow: PropertiesUnitOfWork) -> None:
     email, afm, iban = Email(cmd.email), Afm(cmd.afm), Iban(cmd.iban)
+    holder_name = AccountHolderName(cmd.holder_name)
     with uow:
         if uow.owners.find_by_afm(afm) is not None:
             raise OwnerAlreadyRegistered("afm")
@@ -75,6 +81,7 @@ def register_owner(cmd: RegisterOwner, uow: PropertiesUnitOfWork) -> None:
                 phone=cmd.phone,
                 afm=afm,
                 iban=iban,
+                holder_name=holder_name,
             )
         )
         uow.commit()
@@ -83,7 +90,9 @@ def register_owner(cmd: RegisterOwner, uow: PropertiesUnitOfWork) -> None:
 def update_owner_details(cmd: UpdateOwnerDetails, uow: PropertiesUnitOfWork) -> None:
     email = Email(cmd.email)
     with uow:
-        owner = uow.owners.get(cmd.owner_id, expected_version=cmd.expected_version)
+        owner = _owner(uow, cmd.owner_id, cmd.acting_owner_id, cmd.expected_version)
+        if cmd.acting_owner_id is not None and email != owner.email:
+            raise ChangeThroughTheIke("email")  # the owner's email is their login
         holder = uow.owners.find_by_email(email)
         if holder is not None and holder.id != owner.id:
             raise OwnerAlreadyRegistered("email")
@@ -91,10 +100,14 @@ def update_owner_details(cmd: UpdateOwnerDetails, uow: PropertiesUnitOfWork) -> 
         uow.commit()
 
 
-def change_owner_iban(cmd: ChangeOwnerIban, uow: PropertiesUnitOfWork) -> None:
-    iban = Iban(cmd.iban)
+def change_bank_account(cmd: ChangeBankAccount, uow: PropertiesUnitOfWork) -> None:
+    iban, holder_name = Iban(cmd.iban), AccountHolderName(cmd.holder_name)
     with uow:
-        uow.owners.get(cmd.owner_id, expected_version=cmd.expected_version).change_iban(iban)
+        owner = _owner(uow, cmd.owner_id, cmd.acting_owner_id, cmd.expected_version)
+        if cmd.acting_owner_id is None:
+            owner.change_bank_account(iban, holder_name)
+        else:
+            owner.change_own_bank_account(iban, holder_name)
         uow.commit()
 
 
@@ -103,14 +116,26 @@ def start_bank_account_verification(
     uow: PropertiesUnitOfWork,
     bank_account_verifier: BankAccountVerifier,
 ) -> None:
-    """A €0.01 test transfer is sent with a fresh code in its reference (DOMAIN §5)."""
+    """A €0.01 test transfer is to be sent with a fresh code in its reference (DOMAIN §5)."""
     code = bank_account_verifier.new_code()
     with uow:
-        owner = uow.owners.get(cmd.owner_id)
+        owner = _owner(uow, cmd.owner_id, cmd.acting_owner_id)
         owner.start_bank_verification(code)
         bank_account_verifier.request_test_transfer(
-            owner_id=owner.id, iban=owner.bank_account.iban, code=code, outbox=uow.outbox
+            owner_id=owner.id,
+            iban=owner.bank_account.iban,
+            holder_name=owner.bank_account.holder_name,
+            code=code,
+            outbox=uow.outbox,
         )
+        uow.commit()
+
+
+def record_test_transfer(cmd: RecordTestTransfer, uow: PropertiesUnitOfWork) -> None:
+    """The admin records the test transfer and the bank's payee check (ADR 0018)."""
+    check = _payee_check(cmd.result, cmd.bank_name)
+    with uow:
+        uow.owners.get(cmd.owner_id).record_test_transfer(check)
         uow.commit()
 
 
@@ -118,10 +143,32 @@ def confirm_bank_account(
     cmd: ConfirmBankAccount, uow: PropertiesUnitOfWork, bank_verification: BankVerificationPolicy
 ) -> None:
     with uow:
-        outcome = uow.owners.get(cmd.owner_id).confirm_bank_account(cmd.code, bank_verification)
+        owner = _owner(uow, cmd.owner_id, cmd.acting_owner_id)
+        outcome = owner.confirm_bank_account(cmd.code, bank_verification)
         uow.commit()  # a wrong attempt counts, so it is saved before the error is reported
     if not outcome.verified:
         raise WrongVerificationCode(outcome.attempts_left)
+
+
+def _owner(
+    uow: PropertiesUnitOfWork,
+    owner_id: UUID,
+    acting_owner_id: UUID | None,
+    expected_version: int | None = None,
+) -> Owner:
+    """The owner a command is about. From the portal, only the acting owner's own (ADR 0017):
+    anyone else's is "not found", so the portal never tells that it exists."""
+    if acting_owner_id is not None and acting_owner_id != owner_id:
+        raise OwnerNotFound(f"no owner has id {owner_id}")
+    return uow.owners.get(owner_id, expected_version=expected_version)
+
+
+def _payee_check(result: str, bank_name: str) -> PayeeCheck:
+    try:
+        kind = PayeeCheckResult(result)
+    except ValueError as error:
+        raise InvalidValue(f"{result!r} is not a payee check", field="payee_check") from error
+    return PayeeCheck(kind, AccountHolderName(bank_name) if bank_name.strip() else None)
 
 
 # --- properties ----------------------------------------------------------------------------------
@@ -310,8 +357,9 @@ def _keep_if_none(new: str | None, stored: str) -> str:
 COMMAND_HANDLERS: dict[type[Command], Callable[..., None]] = {
     RegisterOwner: register_owner,
     UpdateOwnerDetails: update_owner_details,
-    ChangeOwnerIban: change_owner_iban,
+    ChangeBankAccount: change_bank_account,
     StartBankAccountVerification: start_bank_account_verification,
+    RecordTestTransfer: record_test_transfer,
     ConfirmBankAccount: confirm_bank_account,
     CreateProperty: create_property,
     UpdatePropertyProfile: update_property_profile,

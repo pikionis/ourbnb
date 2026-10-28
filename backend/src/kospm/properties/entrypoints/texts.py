@@ -14,12 +14,14 @@ from kospm.properties.domain.checklist import ActivationRequirement, ProfileItem
 from kospm.properties.domain.errors import (
     BankAccountAlreadyVerified,
     BankVerificationNotStarted,
+    ChangeThroughTheIke,
     InvalidStatusTransition,
     InvalidValue,
     OwnerAlreadyRegistered,
     ProfileMustStayComplete,
     PropertyCodeTaken,
     PropertyNotReadyForActivation,
+    TransferNotSentYet,
     WrongVerificationCode,
 )
 from kospm.properties.models import PropertyStatusChoices
@@ -52,6 +54,12 @@ INVALID_VALUE_MESSAGES: dict[str, StrOrPromise] = {
     "email": gettext_lazy("Enter a valid email address."),
     "afm": gettext_lazy("Enter a valid tax number (AFM): 9 digits with a correct check digit."),
     "iban": gettext_lazy("Enter a valid IBAN."),
+    "holder_name": gettext_lazy(
+        "Enter the account holder's name as the bank writes it (at most 70 characters)."
+    ),
+    "payee_check": gettext_lazy(
+        "Choose the bank's answer; only “the name almost matches” takes the bank's spelling."
+    ),
     "verification_code": gettext_lazy("The verification code has 6 digits."),
     "code": gettext_lazy(
         "Use 2 to 16 characters: Latin letters or digits, in groups joined by single hyphens "
@@ -81,6 +89,16 @@ INVALID_VALUE_MESSAGES: dict[str, StrOrPromise] = {
     "ama_number": gettext_lazy(
         "Enter the AMA number. A recorded number can be corrected, not removed."
     ),
+}
+
+
+# What the owner is told when the portal leaves a change to the IKE (ChangeThroughTheIke.item).
+CHANGE_THROUGH_THE_IKE: dict[str, StrOrPromise] = {
+    "bank_account": gettext_lazy(
+        "Your bank account is verified: to change it, contact us. This protects your payouts."
+    ),
+    "email": gettext_lazy("Your email address is your login: to change it, contact us."),
+    "property": gettext_lazy("This property is no longer being set up: to change it, contact us."),
 }
 
 
@@ -124,6 +142,10 @@ def describe(error: Exception) -> str:
         return _("Wrong code. Send a new test transfer.")
     if isinstance(error, BankVerificationNotStarted):
         return _("Start the verification first: send the test transfer.")
+    if isinstance(error, TransferNotSentYet):
+        return _("The test transfer has not been sent yet.")
+    if isinstance(error, ChangeThroughTheIke):
+        return str(CHANGE_THROUGH_THE_IKE.get(error.item, error))
     if isinstance(error, BankAccountAlreadyVerified):
         return _("The bank account is already verified.")
     if isinstance(error, ConcurrencyError):

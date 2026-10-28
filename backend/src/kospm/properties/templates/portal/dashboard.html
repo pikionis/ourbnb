@@ -1,0 +1,61 @@
+{% extends "portal/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Your onboarding" %}{% endblock %}
+{% block content %}
+  {% if overview %}
+    <h1>{% blocktranslate trimmed with name=overview.name %}Welcome, {{ name }}{% endblocktranslate %}</h1>
+    <p class="lead">{% translate "Let us get your properties ready." %}</p>
+  {% else %}
+    <h1>{% translate "Welcome" %}</h1>
+    <p class="lead">{% translate "First, fill in your details. Then you can add your properties." %}</p>
+  {% endif %}
+
+  <ul class="checklist">
+    <li>
+      <a class="checklist-row" href="{% url 'portal:details' %}">
+        {% if overview %}
+          <span class="state state-done" aria-hidden="true">✓</span>
+          <span class="checklist-text"><strong>{% translate "Your details" %}</strong><span class="state-text">{% translate "Done" %}</span></span>
+        {% else %}
+          <span class="state state-missing" aria-hidden="true">!</span>
+          <span class="checklist-text"><strong>{% translate "Your details" %}</strong><span class="state-text">{% translate "Fill them in" %}</span></span>
+        {% endif %}
+        <span class="chevron" aria-hidden="true">›</span>
+      </a>
+    </li>
+    {% if overview %}
+      <li>
+        <a class="checklist-row" href="{% url 'portal:bank' %}">
+          {% if overview.bank.status == "verified" %}
+            <span class="state state-done" aria-hidden="true">✓</span>
+          {% elif overview.bank.status == "unverified" %}
+            <span class="state state-missing" aria-hidden="true">!</span>
+          {% else %}
+            <span class="state state-waiting" aria-hidden="true">…</span>
+          {% endif %}
+          <span class="checklist-text"><strong>{% translate "Bank account" %}</strong><span class="state-text">{{ bank_status }}</span></span>
+          <span class="chevron" aria-hidden="true">›</span>
+        </a>
+      </li>
+    {% endif %}
+  </ul>
+
+  {% if overview %}
+    <h2>{% translate "Your properties" %}</h2>
+    {% if properties %}
+      <ul class="cards">
+        {% for item in properties %}
+          <li class="card property-card">
+            <p class="property-name"><strong>{{ item.summary.name }}</strong> · {{ item.summary.code }}</p>
+            <p class="state-text">{{ item.status }} · {% blocktranslate trimmed with ready=item.summary.ready total=item.summary.total %}{{ ready }} of {{ total }} ready{% endblocktranslate %}</p>
+            {% if item.missing %}
+              <p class="fine-print">{% translate "Missing:" %} {{ item.missing|join:", " }}</p>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>{% translate "You have no properties with us yet." %}</p>
+    {% endif %}
+  {% endif %}
+{% endblock %}

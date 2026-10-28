@@ -644,3 +644,197 @@ msgstr "Σας προσκαλούμε στην πύλη ιδιοκτητών %(p
 
 msgid "content"
 msgstr "περιεχόμενο"
+
+# --- properties: the owner portal (Phase 2b, step 3) and the payee check (ADR 0018) ------------
+
+msgid "%(name)s: send €0.01 to %(iban)s, payee %(holder)s, with reference %(code)s. Then record below what the bank's payee check answered."
+msgstr "%(name)s: στείλε 0,01 € στο %(iban)s, δικαιούχος %(holder)s, με αιτιολογία %(code)s. Μετά κατέγραψε παρακάτω τι απάντησε ο έλεγχος ονόματος της τράπεζας."
+
+msgid "%(ready)s of %(total)s ready"
+msgstr "%(ready)s από %(total)s έτοιμα"
+
+msgid "A different account or name must be verified again: the transfer on its way is cancelled."
+msgstr "Άλλος λογαριασμός ή άλλο όνομα θέλει νέα επαλήθευση: η μεταφορά που ετοιμάζεται ακυρώνεται."
+
+msgid "Account holder"
+msgstr "Δικαιούχος λογαριασμού"
+
+msgid "Account holder:"
+msgstr "Δικαιούχος:"
+
+msgid "account holder"
+msgstr "δικαιούχος λογαριασμού"
+
+msgid "Change the account"
+msgstr "Αλλαγή λογαριασμού"
+
+msgid "Choose the bank's answer; only “the name almost matches” takes the bank's spelling."
+msgstr "Επίλεξε την απάντηση της τράπεζας· μόνο το «το όνομα σχεδόν ταιριάζει» παίρνει τη γραφή της τράπεζας."
+
+msgid "Code"
+msgstr "Κωδικός"
+
+msgid "Confirm"
+msgstr "Επιβεβαίωση"
+
+msgid "Contact us and we will send you an invitation."
+msgstr "Επικοινωνήστε μαζί μας για να σας στείλουμε πρόσκληση."
+
+msgid "Done"
+msgstr "Ολοκληρώθηκε"
+
+msgid "Enter the account holder's name as the bank writes it (at most 70 characters)."
+msgstr "Γράψτε το όνομα του δικαιούχου όπως το γράφει η τράπεζα (έως 70 χαρακτήρες)."
+
+msgid "Enter the code"
+msgstr "Γράψτε τον κωδικό"
+
+msgid "Fill them in"
+msgstr "Συμπληρώστε τα"
+
+msgid "First, fill in your details. Then you can add your properties."
+msgstr "Πρώτα συμπληρώστε τα στοιχεία σας. Μετά μπορείτε να προσθέσετε τα ακίνητά σας."
+
+msgid "Full name"
+msgstr "Ονοματεπώνυμο"
+
+msgid "Home"
+msgstr "Αρχική"
+
+msgid "Let us get your properties ready."
+msgstr "Ας ετοιμάσουμε τα ακίνητά σας."
+
+msgid "Look at the €0.01 transfer on your statement: the code is in its reference. It may take 1–2 working days to appear."
+msgstr "Βρείτε τη μεταφορά των 0,01 € στην κίνηση του λογαριασμού σας: ο κωδικός είναι στην αιτιολογία. Μπορεί να φανεί σε 1–2 εργάσιμες."
+
+msgid "Missing:"
+msgstr "Λείπουν:"
+
+msgid "Mobile phone"
+msgstr "Κινητό τηλέφωνο"
+
+msgid "name returned by the bank"
+msgstr "όνομα που επέστρεψε η τράπεζα"
+
+msgid "Not verified yet"
+msgstr "Δεν έχει επαληθευτεί ακόμα"
+
+msgid "Only for “the name almost matches”: the bank's spelling of the name."
+msgstr "Μόνο για «το όνομα σχεδόν ταιριάζει»: το όνομα όπως το γράφει η τράπεζα."
+
+msgid "Our bank did not recognise the account holder's name for this IBAN, so we did not send the transfer. Check the name as your bank writes it, save, and ask again."
+msgstr "Η τράπεζά μας δεν αναγνώρισε το όνομα του δικαιούχου για αυτό το IBAN, γι' αυτό δεν στείλαμε τη μεταφορά. Ελέγξτε το όνομα όπως το γράφει η τράπεζά σας, αποθηκεύστε και ζητήστε ξανά."
+
+msgid "payee check"
+msgstr "έλεγχος ονόματος δικαιούχου"
+
+msgid "Save"
+msgstr "Αποθήκευση"
+
+msgid "Save the account"
+msgstr "Αποθήκευση λογαριασμού"
+
+msgid "Sent; the owner enters the code they read on their statement."
+msgstr "Στάλθηκε· ο ιδιοκτήτης γράφει τον κωδικό που βλέπει στην κίνηση του λογαριασμού του."
+
+msgid "Tax number (AFM)"
+msgstr "ΑΦΜ"
+
+msgid "test transfer sent: the bank's payee check"
+msgstr "η δοκιμαστική μεταφορά στάλθηκε: ο έλεγχος ονόματος της τράπεζας"
+
+msgid "Thank you! Your details are saved."
+msgstr "Ευχαριστούμε! Τα στοιχεία σας αποθηκεύτηκαν."
+
+msgid "The 6-digit code in the reference of our €0.01 transfer."
+msgstr "Ο 6ψήφιος κωδικός από την αιτιολογία της μεταφοράς των 0,01 €."
+
+msgid "The check was not possible"
+msgstr "Ο έλεγχος δεν ήταν δυνατός"
+
+msgid "The name almost matches"
+msgstr "Το όνομα σχεδόν ταιριάζει"
+
+msgid "The name does not match (not sent)"
+msgstr "Το όνομα δεν ταιριάζει (δεν στάλθηκε)"
+
+msgid "The name matches"
+msgstr "Το όνομα ταιριάζει"
+
+msgid "The test transfer has not been sent yet."
+msgstr "Η δοκιμαστική μεταφορά δεν έχει σταλεί ακόμα."
+
+msgid "The test transfer is recorded."
+msgstr "Η δοκιμαστική μεταφορά καταγράφηκε."
+
+msgid "This property is no longer being set up: to change it, contact us."
+msgstr "Το ακίνητο δεν είναι πια σε προετοιμασία: για αλλαγές επικοινωνήστε μαζί μας."
+
+msgid "Transfer sent, waiting for the code"
+msgstr "Η μεταφορά στάλθηκε, αναμένεται ο κωδικός"
+
+msgid "Verify my bank account"
+msgstr "Επαλήθευση του λογαριασμού μου"
+
+msgid "Waiting for the test transfer"
+msgstr "Αναμένει τη δοκιμαστική μεταφορά"
+
+msgid "We need it for your contract and your payouts."
+msgstr "Το χρειαζόμαστε για το συμβόλαιό σας και για τις πληρωμές σας."
+
+msgid "We need them for your contract and to pay you. We never ask for your gov.gr, bank or platform passwords."
+msgstr "Τα χρειαζόμαστε για το συμβόλαιό σας και για να σας πληρώνουμε. Δεν ζητάμε ποτέ τους κωδικούς σας στο gov.gr, στην τράπεζα ή στις πλατφόρμες."
+
+msgid "We pay you here. To be sure the account is yours, we send it €0.01 with a 6-digit code in the reference; you type the code here."
+msgstr "Εδώ σας πληρώνουμε. Για να βεβαιωθούμε ότι ο λογαριασμός είναι δικός σας, στέλνουμε 0,01 € με έναν 6ψήφιο κωδικό στην αιτιολογία και εσείς τον γράφετε εδώ."
+
+msgid "We sent you €0.01: enter its code"
+msgstr "Σας στείλαμε 0,01 €: γράψτε τον κωδικό του"
+
+msgid "We will send you the €0.01 test transfer soon. Come back here when you see it on your statement."
+msgstr "Θα σας στείλουμε σύντομα τη δοκιμαστική μεταφορά των 0,01 €. Επιστρέψτε εδώ όταν τη δείτε στην κίνηση του λογαριασμού σας."
+
+msgid "We will send you the €0.01 test transfer."
+msgstr "Θα σας στείλουμε τη δοκιμαστική μεταφορά των 0,01 €."
+
+msgid "We will send you €0.01"
+msgstr "Θα σας στείλουμε 0,01 €"
+
+msgid "Welcome"
+msgstr "Καλώς ήρθατε"
+
+msgid "Welcome, %(name)s"
+msgstr "Καλώς ήρθατε, %(name)s"
+
+msgid "What e-banking answered when you sent the €0.01 (ADR 0018)."
+msgstr "Τι απάντησε το e-banking όταν έστειλες τα 0,01 € (ADR 0018)."
+
+msgid "Write the name exactly as your bank holds it, often in Latin capitals (e.g. PAPADOPOULOU MARIA)."
+msgstr "Γράψτε το όνομα ακριβώς όπως το έχει η τράπεζά σας, συνήθως με λατινικά κεφαλαία (π.χ. PAPADOPOULOU MARIA)."
+
+msgid "You have no properties with us yet."
+msgstr "Δεν έχετε ακόμα ακίνητα σε εμάς."
+
+msgid "Your bank account is saved."
+msgstr "Ο τραπεζικός σας λογαριασμός αποθηκεύτηκε."
+
+msgid "Your bank account is verified. Thank you!"
+msgstr "Ο τραπεζικός σας λογαριασμός επαληθεύτηκε. Ευχαριστούμε!"
+
+msgid "Your bank account is verified: to change it, contact us. This protects your payouts."
+msgstr "Ο τραπεζικός σας λογαριασμός είναι επαληθευμένος: για αλλαγή επικοινωνήστε μαζί μας. Έτσι προστατεύονται οι πληρωμές σας."
+
+msgid "Your details"
+msgstr "Τα στοιχεία σας"
+
+msgid "Your details are saved."
+msgstr "Τα στοιχεία σας αποθηκεύτηκαν."
+
+msgid "Your email address is your login: to change it, contact us."
+msgstr "Η διεύθυνση email σας είναι η σύνδεσή σας: για αλλαγή επικοινωνήστε μαζί μας."
+
+msgid "Your onboarding"
+msgstr "Η ένταξή σας"
+
+msgid "Your properties"
+msgstr "Τα ακίνητά σας"

@@ -178,6 +178,50 @@ textarea { min-height: 7rem; resize: vertical; }
 .error-summary ul { margin: 0; padding-left: 1.1rem; }
 .error-summary a { color: var(--error); }
 
+/* --- checklist ------------------------------------------------------------------------------- */
+
+.checklist, .cards { list-style: none; margin: 0 0 1.5rem; padding: 0; }
+.checklist li { margin-bottom: 0.5rem; }
+
+.checklist-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 56px;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  text-decoration: none;
+}
+.checklist-row:hover { border-color: var(--accent); color: var(--text); }
+.checklist-text { display: flex; flex-direction: column; flex: 1; }
+.state-text { color: var(--muted); font-size: 0.95rem; margin: 0; }
+.chevron { color: var(--muted); font-size: 1.4rem; }
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  color: #ffffff;
+  font-weight: 700;
+}
+.state-done { background: var(--done); }
+.state-waiting { background: var(--waiting); }
+.state-missing { background: var(--missing); }
+
+.cards .card { margin-top: 0.75rem; }
+.property-name { margin-bottom: 0.25rem; }
+
+.label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
+.readonly-value { font-size: 1.05rem; margin-bottom: 0.25rem; overflow-wrap: anywhere; }
+.alert-info { border-left-color: var(--waiting); }
+
 .badge {
   display: inline-block;
   padding: 0.1rem 0.6rem;

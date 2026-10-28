@@ -1,0 +1,29 @@
+{% extends "portal/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Your details" %}{% endblock %}
+{% block content %}
+  <p><a href="{% url 'portal:dashboard' %}">‹ {% translate "Home" %}</a></p>
+  <h1>{% translate "Your details" %}</h1>
+  {% if not overview %}
+    <p class="lead">{% translate "We need them for your contract and to pay you. We never ask for your gov.gr, bank or platform passwords." %}</p>
+  {% endif %}
+  <div class="field">
+    <span class="label">{% translate "Email" %}</span>
+    <p class="readonly-value">{{ email }}</p>
+    <p class="help">{% translate "Your email address is your login: to change it, contact us." %}</p>
+  </div>
+  {% if overview %}
+    <div class="field">
+      <span class="label">{% translate "Tax number (AFM)" %}</span>
+      <p class="readonly-value">{{ overview.afm }}</p>
+    </div>
+  {% endif %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "portal/form.html" with form=form %}
+    <button type="submit" class="button">{% translate "Save" %}</button>
+  </form>
+  {% if overview %}
+    <p class="secondary-links"><a href="{% url 'portal:bank' %}">{% translate "Bank account" %} ›</a></p>
+  {% endif %}
+{% endblock %}

@@ -12,7 +12,7 @@ from uuid import UUID
 from kospm.properties.domain.errors import OwnerNotFound, PropertyNotFound
 from kospm.properties.domain.owner import Owner
 from kospm.properties.domain.property import Property
-from kospm.properties.domain.value_objects import Afm, Email, Iban, PropertyCode
+from kospm.properties.domain.value_objects import AccountHolderName, Afm, Email, Iban, PropertyCode
 from kospm.properties.service_layer.ports import BankAccountVerifier
 from kospm.properties.service_layer.unit_of_work import (
     OwnerRepository,
@@ -98,6 +98,7 @@ class FakePropertiesUnitOfWork(FakeUnitOfWorkBase, PropertiesUnitOfWork):
 class RequestedTransfer:
     owner_id: UUID
     iban: Iban
+    holder_name: AccountHolderName
     code: str
 
 
@@ -112,6 +113,12 @@ class FakeBankAccountVerifier(BankAccountVerifier):
         return next(self._codes)
 
     def request_test_transfer(
-        self, *, owner_id: UUID, iban: Iban, code: str, outbox: AbstractOutbox
+        self,
+        *,
+        owner_id: UUID,
+        iban: Iban,
+        holder_name: AccountHolderName,
+        code: str,
+        outbox: AbstractOutbox,
     ) -> None:
-        self.transfers.append(RequestedTransfer(owner_id, iban, code))
+        self.transfers.append(RequestedTransfer(owner_id, iban, holder_name, code))
