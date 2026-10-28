@@ -1,5 +1,6 @@
-"""The owner's properties in the portal end to end (DOMAIN §5 owner portal, design brief J5, J7,
-J8): add, profile with photos, contract to sign, sublease declaration, own files only."""
+"""The owner's properties in the portal end to end (DOMAIN §5 owner portal, design brief J5 to
+J8): add, profile with photos, profile from listing text, contract to sign, sublease declaration,
+own files only."""
 
 from pathlib import Path
 from typing import Any
@@ -13,8 +14,11 @@ from django.urls import reverse
 from kospm.properties import models
 from kospm.properties.adapters.queries import owner_property
 from kospm.properties.domain.checklist import ActivationRequirement
+from kospm.properties.domain.listing import ListingDraft
+from kospm.properties.entrypoints.portal import property_views
 from tests.e2e.owners import MARIA, logged_in_owner, owner_form, register_owner_in_admin
 from tests.unit.properties.builders import OTHER_VALID_AFM, VALID_AFM, VALID_IBAN
+from tests.unit.properties.fakes import FakeListingExtractor
 
 pytestmark = pytest.mark.django_db
 
@@ -23,6 +27,25 @@ pytestmark = pytest.mark.django_db
 def media_in_tmp(settings: Any, tmp_path: Path) -> None:
     settings.MEDIA_ROOT = tmp_path
     cache.clear()
+
+
+@pytest.fixture
+def assistant(monkeypatch: pytest.MonkeyPatch) -> FakeListingExtractor:
+    """The Claude API replaced by a fake that answers with a known draft."""
+    fake = FakeListingExtractor(
+        ListingDraft(
+            address="Λάμπη, Κως 853 00",
+            directions_el="Δεύτερο στενό δεξιά μετά τον φούρνο.",
+            directions_en="Second street on the right after the bakery.",
+            amenities_included=("Wi-Fi", "Beach umbrellas"),
+            amenities_not_included=("Pool",),
+        )
+    )
+    monkeypatch.setattr(property_views, "listing_extractor", lambda: fake)
+    return fake
+
+
+LISTING = "Όμορφο σπίτι στη Λάμπη, 300 μέτρα από τη θάλασσα. Wi-Fi, ομπρέλες θαλάσσης."
 
 
 def photo(name: str = "house.jpg") -> SimpleUploadedFile:
@@ -153,6 +176,84 @@ class TestAddAndComplete:
         assert "Ετοιμάζουμε το συμβόλαιό σας" in content
 
 
+class TestFillInFromListing:
+    """J6: the owner pastes the listing's text; the profile comes back filled in, unsaved."""
+
+    def test_the_profile_comes_back_filled_in_and_nothing_is_saved(
+        self, assistant: FakeListingExtractor
+    ) -> None:
+        client = logged_in_owner()
+        registered(client)
+        prop = add_property(client)
+        profile_page, listing_page = (
+            page(client, "property_profile", prop.code),
+            page(client, "property_listing", prop.code),
+        )
+        assert listing_page in client.get(profile_page).content.decode()
+        version = _version(prop)
+
+        response = client.post(listing_page, {"text": LISTING})
+
+        html = response.content.decode()
+        assert response.status_code == 200
+        assert [listing.value for listing in assistant.read] == [LISTING]
+        assert 'value="Λάμπη, Κως 853 00"' in html
+        assert "Second street on the right after the bakery." in html
+        assert "Beach umbrellas" in html
+        assert html.count("badge-check") == 6  # each field that came from the text is marked
+        assert f'action="{profile_page}"' in html  # Save sends the usual profile form
+        assert _version(prop) == version  # nothing is saved until the owner saves
+        assert prop.address == ""
+
+    def test_a_link_is_refused_and_nothing_is_sent(self, assistant: FakeListingExtractor) -> None:
+        client = logged_in_owner()
+        registered(client)
+        prop = add_property(client)
+
+        response = client.post(
+            page(client, "property_listing", prop.code),
+            {"text": "https://www.airbnb.com/rooms/123"},
+        )
+
+        assert 'id="id_text_error"' in response.content.decode()
+        assert assistant.read == []
+
+    def test_without_the_assistant_the_owner_fills_in_the_profile_by_hand(self) -> None:
+        client = logged_in_owner()  # the test settings have no API key
+        registered(client)
+        prop = add_property(client)
+
+        response = client.post(page(client, "property_listing", prop.code), {"text": LISTING})
+
+        assert "δεν μπόρεσε να διαβάσει την αγγελία σας" in response.content.decode()
+
+    def test_the_readings_per_hour_are_limited(
+        self, assistant: FakeListingExtractor, settings: Any
+    ) -> None:
+        settings.LISTING_READINGS_PER_HOUR = 1
+        client = logged_in_owner()
+        registered(client)
+        prop = add_property(client)
+        listing_page = page(client, "property_listing", prop.code)
+
+        client.post(listing_page, {"text": LISTING})
+        response = client.post(listing_page, {"text": LISTING})
+
+        assert len(assistant.read) == 1
+        assert "πολλές φορές" in response.content.decode()
+
+    def test_after_the_set_up_nothing_is_read(self, assistant: FakeListingExtractor) -> None:
+        client = logged_in_owner()
+        registered(client)
+        prop = add_property(client)
+        models.Property.objects.filter(pk=prop.pk).update(status="active")
+
+        response = client.post(page(client, "property_listing", prop.code), {"text": LISTING})
+
+        assert response.status_code == 200
+        assert assistant.read == []
+
+
 class TestOwnDataOnly:
     def test_another_owners_property_and_files_are_not_found(self, admin_client: Client) -> None:
         other = register_owner_in_admin(
@@ -164,7 +265,13 @@ class TestOwnDataOnly:
         )
         client = logged_in_owner()
         registered(client)
-        for name in ("property", "property_profile", "property_contract", "property_sublease"):
+        for name in (
+            "property",
+            "property_profile",
+            "property_listing",
+            "property_contract",
+            "property_sublease",
+        ):
             assert client.get(page(client, name, "KOS-N1")).status_code == 404
         file_page = reverse("portal:property_file", args=["KOS-N1", "contract_draft_document"])
         assert client.get(file_page).status_code == 404

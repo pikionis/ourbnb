@@ -1,9 +1,10 @@
-"""The owner portal's property pages (ADR 0017; design brief J5, J7, J8).
+"""The owner portal's property pages (ADR 0017; design brief J5 to J8).
 
 Only the owner's own properties are found; another owner's code is "not found" (404). Changes
 are previewed on an unsaved copy of the aggregate, as the admin does, so a refusal shows next to
 its field before an upload is stored; the command then names the acting owner, and its handler
-refuses a property that is no longer being set up.
+refuses a property that is no longer being set up. Key-box codes and pasted listing text are
+kept out of error reports.
 """
 
 from collections.abc import Iterable
@@ -19,8 +20,15 @@ from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.translation import gettext as _
+from django.views.decorators.debug import sensitive_post_parameters
 
-from kospm.bootstrap import get_bus, property_defaults
+from kospm.bootstrap import (
+    get_bus,
+    listing_extractor,
+    listing_text_policy,
+    listing_throttle,
+    property_defaults,
+)
 from kospm.properties.adapters.queries import (
     OwnerProperty,
     owner_file,
@@ -34,18 +42,22 @@ from kospm.properties.domain.commands import (
     SignContract,
     UpdatePropertyProfile,
 )
-from kospm.properties.domain.errors import InvalidValue
+from kospm.properties.domain.errors import InvalidValue, ListingNotRead
+from kospm.properties.domain.listing import ListingDraft, ListingTextPolicy
 from kospm.properties.domain.property import Property, PropertyStatus
 from kospm.properties.entrypoints.portal.forms import (
     ContractUploadForm,
+    ListingTextForm,
     NewPropertyForm,
     ProfileForm,
     SubleaseForm,
+    fill_from_listing,
     store_upload,
 )
 from kospm.properties.entrypoints.texts import describe, profile_list
 from kospm.properties.models import PropertyStatusChoices
 from kospm.properties.service_layer.handlers import PropertyEdit, apply_edit
+from kospm.properties.service_layer.listing import draft_from_listing
 from kospm.shared.adapters.portal import owner_page
 from kospm.shared.clock import SystemClock
 from kospm.shared.domain import Command, DomainError, new_id
@@ -94,6 +106,7 @@ def property_page(request: HttpRequest, owner_id: UUID, code: str) -> HttpRespon
     )
 
 
+@sensitive_post_parameters("guest_lockbox_code", "cleaner_lockbox_code")
 @owner_page
 def property_profile(request: HttpRequest, owner_id: UUID, code: str) -> HttpResponse:
     owned = _owned(owner_id, code)
@@ -115,6 +128,36 @@ def property_profile(request: HttpRequest, owner_id: UUID, code: str) -> HttpRes
                 return redirect("portal:property", code=prop.code.value)
             _delete(stored.values())
     return render(request, "portal/profile.html", {**_frame(owned), "form": form})
+
+
+@sensitive_post_parameters("text")
+@owner_page
+def property_listing(request: HttpRequest, owner_id: UUID, code: str) -> HttpResponse:
+    """J6: the profile form comes back filled in from the listing's text, not saved.
+
+    The owner checks it and presses Save, which sends the profile form as usual.
+    """
+    owned = _owned(owner_id, code)
+    prop = owned.prop
+    policy = listing_text_policy()
+    form = ListingTextForm(request.POST or None, max_characters=policy.max_characters)
+    if request.method == "POST" and _editable(prop) and form.is_valid():
+        draft = _read_listing(owner_id, form, policy)
+        if draft is not None:
+            initial, to_check = fill_from_listing(
+                ProfileForm.initial_from(prop, owned.version), draft
+            )
+            return render(
+                request,
+                "portal/profile.html",
+                {
+                    **_frame(owned),
+                    "form": ProfileForm(initial=initial),
+                    "from_listing": True,
+                    "to_check": to_check,
+                },
+            )
+    return render(request, "portal/listing.html", {**_frame(owned), "form": form})
 
 
 @owner_page
@@ -277,6 +320,30 @@ def _profile_command(
         expected_version=data.get("version"),
         acting_owner_id=owner_id,
     )
+
+
+def _read_listing(
+    owner_id: UUID, form: ListingTextForm, policy: ListingTextPolicy
+) -> ListingDraft | None:
+    """The draft read from the pasted text, or None with the reason on the form."""
+    if not listing_throttle().hit(f"owner:{owner_id}"):
+        form.add_error(
+            None,
+            _(
+                "You have asked for this many times in the last hour. Fill in the profile "
+                "yourself, or try again later."
+            ),
+        )
+        return None
+    try:
+        return draft_from_listing(
+            form.cleaned_data["text"], extractor=listing_extractor(), policy=policy
+        )
+    except InvalidValue as error:
+        form.add_error("text", describe(error))
+    except ListingNotRead as error:
+        form.add_error(None, describe(error))
+    return None
 
 
 def _preview_names(prop: Property, uploads: dict[str, UploadedFile | None]) -> dict[str, str]:

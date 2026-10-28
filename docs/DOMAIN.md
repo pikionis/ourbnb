@@ -290,6 +290,14 @@ with `/domain-change` if the business wants otherwise.
   and the links already sent to the old one stop working.
 - An email link never changes anything when it is only opened: the owner presses a button
   (mail scanners open links). A login address has at most 150 characters.
+- Listing text:
+  - The text is at most 20,000 characters, and an owner may have it read 10 times an hour. Both
+    limits are configuration, for cost.
+  - The draft fills only the fields the owner left empty. Anything the owner already entered
+    stays as it is.
+  - An amenity is matched to the standard Yes/No list ignoring case, spaces and hyphens
+    ("WiFi" is "Wi-Fi"); any other amenity is added to the free-text lists.
+  - An amenity the draft gives both ways is left for the owner to answer.
 
 ---
 

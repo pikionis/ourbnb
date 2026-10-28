@@ -131,6 +131,21 @@ PORTAL_CLIENT_IP_HEADER = ""
 # Largest file an owner may upload (photos, the signed contract), in megabytes.
 PORTAL_UPLOAD_MAX_MB = 15
 
+# --- Listing text read by the Claude API (DOMAIN §5 owner portal; design brief J6) ------------
+
+# Without a key the owner fills in the profile by hand (the default in development and tests).
+ANTHROPIC_API_KEY = env.str("ANTHROPIC_API_KEY", default="")
+# Reading a listing is a small task: a low effort answers sooner and costs less.
+# Efforts: "low", "medium", "high", "xhigh", "max".
+LISTING_EXTRACTOR_MODEL = env.str("LISTING_EXTRACTOR_MODEL", default="claude-opus-5-5")
+LISTING_EXTRACTOR_EFFORT = env.str("LISTING_EXTRACTOR_EFFORT", default="low")
+# How long the owner's page waits for an answer. A failed call is retried once, so the page may
+# wait twice this: the web server's timeout must be longer (Phase 7).
+LISTING_EXTRACTOR_TIMEOUT_SECONDS = 60
+# The longest text sent in one reading, and the readings allowed per owner per hour (cost).
+LISTING_TEXT_MAX_CHARS = 20_000
+LISTING_READINGS_PER_HOUR = 10
+
 # --- Email: delivered by the outbox worker through this backend (ADR 0005, 0017) ---------------
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

@@ -5,7 +5,7 @@ command. The email is not a field: it is the owner's login (DOMAIN §5, owner po
 """
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
@@ -20,6 +20,7 @@ from django_stubs_ext import StrOrPromise
 
 from kospm.properties import models
 from kospm.properties.domain.errors import InvalidValue
+from kospm.properties.domain.listing import ListingDraft, ListingText
 from kospm.properties.domain.property import Property
 from kospm.properties.domain.value_objects import AccountHolderName, Afm, Iban
 from kospm.properties.entrypoints.texts import describe
@@ -98,8 +99,8 @@ class CodeForm(forms.Form):
 
 # --- properties (design brief J5, J7, J8) ---------------------------------------------------------
 
-# Amenities offered as Yes / No (design brief §8). Stored by their English name, so the list
-# reads the same in the admin and to the AI; shown translated.
+# The labels of the amenities offered as Yes / No (domain/amenities.py: COMMON_AMENITIES, in the
+# same order). Stored by their English name; shown translated.
 STANDARD_AMENITIES: dict[str, StrOrPromise] = {
     "Wi-Fi": _("Wi-Fi"),
     "Air conditioning": _("Air conditioning"),
@@ -269,6 +270,69 @@ class ProfileForm(_UploadsForm):
         included += _lines(data.get("other_included", ""))
         not_included += _lines(data.get("other_not_included", ""))
         return tuple(included), tuple(not_included)
+
+
+class ListingTextForm(forms.Form):
+    """Design brief J6: the text of the owner's listing, pasted (never its link, DOMAIN §2.1)."""
+
+    def __init__(self, *args: Any, max_characters: int, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["text"] = forms.CharField(
+            label=_("The text of your listing"),
+            max_length=max_characters,
+            widget=forms.Textarea(attrs={"rows": 12}),
+            help_text=_(
+                "Paste the text of your listing, not its link. We fill in what we find, and you "
+                "check it before saving."
+            ),
+        )
+
+    def clean_text(self) -> str:
+        return _checked(lambda: ListingText(self.cleaned_data["text"]).value)
+
+
+_FROM_LISTING = ("address", "directions_el", "directions_en")
+_OTHER_AMENITIES = {"yes": "other_included", "no": "other_not_included"}
+
+
+def fill_from_listing(
+    initial: Mapping[str, Any], draft: ListingDraft
+) -> tuple[dict[str, Any], set[str]]:
+    """The profile form's values with its gaps filled in from the draft (design brief J6).
+
+    What the owner entered stays as it is. Returns the names of the fields the draft filled in,
+    which the page marks "check this". A draft has no key-box code or photo to fill in.
+    """
+    filled, to_check = dict(initial), set[str]()
+    for name in _FROM_LISTING:
+        value = getattr(draft, name)
+        if value and not filled.get(name):
+            filled[name] = value
+            to_check.add(name)
+    standard = {_amenity_key(name): amenity_field(name) for name in STANDARD_AMENITIES}
+    others = {field: _lines(str(filled.get(field) or "")) for field in _OTHER_AMENITIES.values()}
+    known = {_amenity_key(item) for lines in others.values() for item in lines}
+    for answer, items in (
+        ("yes", draft.amenities_included),
+        ("no", draft.amenities_not_included),
+    ):
+        for item in items:
+            key = _amenity_key(item)
+            if key in standard:
+                if not filled.get(standard[key]):
+                    filled[standard[key]] = answer
+                    to_check.add(standard[key])
+            elif key and key not in known:
+                others[_OTHER_AMENITIES[answer]].append(item)
+                known.add(key)
+                to_check.add(_OTHER_AMENITIES[answer])
+    filled.update({field: "\n".join(lines) for field, lines in others.items()})
+    return filled, to_check
+
+
+def _amenity_key(name: str) -> str:
+    """Wi-Fi, WiFi and wifi are one amenity: letters and digits only, of any script and case."""
+    return re.sub(r"[\W_]+", "", name.casefold())
 
 
 class ContractUploadForm(_UploadsForm):

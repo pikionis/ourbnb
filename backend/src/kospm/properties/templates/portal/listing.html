@@ -1,0 +1,15 @@
+{% extends "portal/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Fill in from your listing" %}{% endblock %}
+{% block content %}
+  {% include "portal/_property_header.html" %}
+  <h1>{% translate "Fill in from your listing" %}</h1>
+  <p class="lead">{% translate "Copy the text of your listing on Airbnb or Booking (the description, the amenities, how to get there) and paste it below." %}</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "portal/form.html" with form=form %}
+    <p class="fine-print">{% translate "An AI assistant (Claude, by Anthropic) reads the text to fill in the form; we do not keep the text. Reading takes up to a minute. Do not paste key box codes or passwords." %}</p>
+    {% if editable %}<button type="submit" class="button">{% translate "Fill in the profile" %}</button>{% endif %}
+  </form>
+  <p class="secondary-links"><a href="{% url 'portal:property_profile' prop.code.value %}">{% translate "Fill in the profile yourself" %}</a></p>
+{% endblock %}

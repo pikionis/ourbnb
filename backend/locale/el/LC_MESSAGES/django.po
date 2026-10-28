@@ -6,6 +6,47 @@ msgstr ""
 "Language: el\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+# --- properties: listing text read by the AI (Phase 2b, step 5) --------------------------------
+
+msgid "An AI assistant (Claude, by Anthropic) reads the text to fill in the form; we do not keep the text. Reading takes up to a minute. Do not paste key box codes or passwords."
+msgstr "Το κείμενο το διαβάζει ένας βοηθός τεχνητής νοημοσύνης (το Claude της Anthropic) για να συμπληρώσει τη φόρμα· εμείς δεν το κρατάμε. Η ανάγνωση διαρκεί έως ένα λεπτό. Μην επικολλάτε κωδικούς του κουτιού κλειδιών ή κωδικούς πρόσβασης."
+
+msgid "check this"
+msgstr "ελέγξτε το"
+
+msgid "Copy the text of your listing on Airbnb or Booking (the description, the amenities, how to get there) and paste it below."
+msgstr "Αντιγράψτε το κείμενο της αγγελίας σας στο Airbnb ή στο Booking (την περιγραφή, τις παροχές, πώς θα φτάσει κανείς) και επικολλήστε το παρακάτω."
+
+msgid "Fill in from your listing"
+msgstr "Συμπλήρωση από την αγγελία σας"
+
+msgid "Fill in the profile"
+msgstr "Συμπλήρωση του προφίλ"
+
+msgid "Fill in the profile yourself"
+msgstr "Συμπληρώστε το προφίλ μόνοι σας"
+
+msgid "Paste the text of your listing, not its link."
+msgstr "Επικολλήστε το κείμενο της αγγελίας σας, όχι τον σύνδεσμο."
+
+msgid "Paste the text of your listing, not its link. We fill in what we find, and you check it before saving."
+msgstr "Επικολλήστε το κείμενο της αγγελίας σας, όχι τον σύνδεσμο. Συμπληρώνουμε όσα πεδία βρούμε και εσείς τα ελέγχετε πριν την αποθήκευση."
+
+msgid "The assistant could not read your listing right now. Fill in the profile yourself, or try again later."
+msgstr "Ο βοηθός δεν μπόρεσε να διαβάσει την αγγελία σας αυτή τη στιγμή. Συμπληρώστε το προφίλ μόνοι σας ή δοκιμάστε ξανά αργότερα."
+
+msgid "The text of your listing"
+msgstr "Το κείμενο της αγγελίας σας"
+
+msgid "We filled in what we found in your listing. Check the fields marked “check this”, add the photos and the key box code, and press Save: nothing is saved until then."
+msgstr "Συμπληρώσαμε όσα βρήκαμε στην αγγελία σας. Ελέγξτε τα πεδία με την ένδειξη «ελέγξτε το», προσθέστε τις φωτογραφίες και τον κωδικό του κουτιού κλειδιών και πατήστε «Αποθήκευση»: μέχρι τότε δεν αποθηκεύεται τίποτα."
+
+msgid "We found nothing new in your listing. Fill in the rest yourself."
+msgstr "Δεν βρήκαμε κάτι νέο στην αγγελία σας. Συμπληρώστε τα υπόλοιπα μόνοι σας."
+
+msgid "You have asked for this many times in the last hour. Fill in the profile yourself, or try again later."
+msgstr "Το ζητήσατε πολλές φορές την τελευταία ώρα. Συμπληρώστε το προφίλ μόνοι σας ή δοκιμάστε ξανά αργότερα."
+
 # --- properties: the owner's property pages (Phase 2b, step 4) ---------------------------------
 
 msgid "A code is saved."

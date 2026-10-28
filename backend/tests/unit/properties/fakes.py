@@ -10,10 +10,11 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from kospm.properties.domain.errors import OwnerNotFound, PropertyNotFound
+from kospm.properties.domain.listing import ListingDraft, ListingText
 from kospm.properties.domain.owner import Owner
 from kospm.properties.domain.property import Property
 from kospm.properties.domain.value_objects import AccountHolderName, Afm, Email, Iban, PropertyCode
-from kospm.properties.service_layer.ports import BankAccountVerifier
+from kospm.properties.service_layer.ports import BankAccountVerifier, ListingTextExtractor
 from kospm.properties.service_layer.unit_of_work import (
     OwnerRepository,
     PropertiesUnitOfWork,
@@ -125,3 +126,15 @@ class FakeBankAccountVerifier(BankAccountVerifier):
         outbox: AbstractOutbox,
     ) -> None:
         self.transfers.append(RequestedTransfer(owner_id, iban, holder_name, code))
+
+
+class FakeListingExtractor(ListingTextExtractor):
+    """Answers with a known draft and records every text it was given to read."""
+
+    def __init__(self, draft: ListingDraft | None = None) -> None:
+        self.read: list[ListingText] = []
+        self._draft = draft or ListingDraft(address="Λάμπη, Κως")
+
+    def extract(self, listing: ListingText) -> ListingDraft:
+        self.read.append(listing)
+        return self._draft

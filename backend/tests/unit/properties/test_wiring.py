@@ -1,6 +1,7 @@
 """Bootstrap turns the properties settings into configuration objects (CLAUDE.md: policies)."""
 
 import re
+from collections.abc import Callable
 from datetime import time
 from decimal import Decimal
 
@@ -8,10 +9,21 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings
 
-from kospm.bootstrap import default_contexts, properties_dependencies
+from kospm.bootstrap import (
+    default_contexts,
+    listing_extractor,
+    listing_text_policy,
+    listing_throttle,
+    properties_dependencies,
+)
 from kospm.properties.adapters.bank_verification import ManualBankAccountVerifier
+from kospm.properties.adapters.listing_extractor import (
+    ClaudeListingExtractor,
+    UnavailableListingExtractor,
+)
 from kospm.properties.domain.commands import ActivateProperty, RegisterOwner
 from kospm.properties.domain.defaults import BankVerificationPolicy, PropertyDefaults
+from kospm.properties.domain.listing import ListingTextPolicy
 from kospm.shared.clock import SystemClock
 from kospm.shared.domain import Money
 
@@ -69,3 +81,36 @@ def test_verification_codes_have_six_digits() -> None:
 def test_the_production_bus_handles_the_properties_commands() -> None:
     contexts = {context.name: context for context in default_contexts(SystemClock())}
     assert {RegisterOwner, ActivateProperty} <= set(contexts["properties"].command_handlers)
+
+
+KEY = "sk-ant-test-not-a-key"
+
+
+def test_without_an_api_key_the_owner_fills_in_the_profile_by_hand() -> None:
+    assert isinstance(listing_extractor(), UnavailableListingExtractor)
+
+
+@override_settings(ANTHROPIC_API_KEY=KEY)
+def test_with_an_api_key_claude_reads_the_listing() -> None:
+    assert isinstance(listing_extractor(), ClaudeListingExtractor)
+
+
+@override_settings(LISTING_TEXT_MAX_CHARS=5000)
+def test_the_listing_text_limit_is_configuration() -> None:
+    assert listing_text_policy() == ListingTextPolicy(max_characters=5000)
+
+
+@pytest.mark.parametrize(
+    ("build", "setting"),
+    [
+        (listing_extractor, {"ANTHROPIC_API_KEY": KEY, "LISTING_EXTRACTOR_EFFORT": "fast"}),
+        (listing_extractor, {"ANTHROPIC_API_KEY": KEY, "LISTING_EXTRACTOR_TIMEOUT_SECONDS": 0}),
+        (listing_text_policy, {"LISTING_TEXT_MAX_CHARS": 0}),
+        (listing_throttle, {"LISTING_READINGS_PER_HOUR": "many"}),
+    ],
+)
+def test_invalid_listing_settings_fail_at_startup(
+    build: Callable[[], object], setting: dict[str, object]
+) -> None:
+    with override_settings(**setting), pytest.raises(ImproperlyConfigured):
+        build()

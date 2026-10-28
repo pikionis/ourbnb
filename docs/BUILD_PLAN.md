@@ -161,7 +161,7 @@ Owners register and complete the checklist themselves (DOMAIN §5). Design brief
 - [x] Contract: the admin uploads the contract to sign (`ContractDraft`); the owner downloads it and
       uploads the signed PDF (signature done by the owner, e.g. on gov.gr — never with their
       credentials on our side). Sublease declaration number.
-- [ ] Paste listing text → AI extracts profile fields (`ListingTextExtractor` port, Claude adapter)
+- [x] Paste listing text → AI extracts profile fields (`ListingTextExtractor` port, Claude adapter)
       → owner reviews. Never fetch a platform URL (DOMAIN §2.1).
 
 **Tests:** sign-up → confirmation link from the outbox → login → details → property → the checklist

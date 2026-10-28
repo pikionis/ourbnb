@@ -4,7 +4,18 @@
 {% block content %}
   {% include "portal/_property_header.html" %}
   <h1>{% translate "Profile and check-in guide" %}</h1>
-  <form method="post" enctype="multipart/form-data" novalidate>
+  {% if from_listing %}
+    <div class="alert alert-warning" role="status">
+      {% if to_check %}
+        {% translate "We filled in what we found in your listing. Check the fields marked “check this”, add the photos and the key box code, and press Save: nothing is saved until then." %}
+      {% else %}
+        {% translate "We found nothing new in your listing. Fill in the rest yourself." %}
+      {% endif %}
+    </div>
+  {% elif editable %}
+    <p><a class="button button-secondary" href="{% url 'portal:property_listing' prop.code.value %}">{% translate "Fill in from your listing" %}</a></p>
+  {% endif %}
+  <form method="post" action="{% url 'portal:property_profile' prop.code.value %}" enctype="multipart/form-data" novalidate>
     {% csrf_token %}
     {% if form.errors %}
       <div class="alert alert-error error-summary" role="alert">
@@ -42,7 +53,7 @@
     <div class="amenities">
       {% for field in form.amenity_fields %}
         <fieldset class="amenity">
-          <legend>{{ field.label }}</legend>
+          <legend>{{ field.label }}{% if to_check and field.name in to_check %} <span class="badge badge-check">{% translate "check this" %}</span>{% endif %}</legend>
           {% for choice in field %}<label class="choice">{{ choice.tag }} {{ choice.choice_label }}</label>{% endfor %}
         </fieldset>
       {% endfor %}

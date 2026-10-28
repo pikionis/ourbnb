@@ -77,6 +77,11 @@ class BankVerificationNotStarted(DomainError):
     """A code was entered, but no test transfer is waiting for one."""
 
 
+class ListingNotRead(DomainError):
+    """The assistant could not read the listing text (unavailable, refused or unclear): the
+    owner fills in the profile by hand."""
+
+
 class NoContractToSign(DomainError):
     """The owner uploaded a signed contract, but the IKE has not offered one to sign yet."""
 

@@ -17,6 +17,7 @@ from kospm.properties.domain.errors import (
     ChangeThroughTheIke,
     InvalidStatusTransition,
     InvalidValue,
+    ListingNotRead,
     OwnerAlreadyRegistered,
     ProfileMustStayComplete,
     PropertyCodeTaken,
@@ -90,6 +91,7 @@ INVALID_VALUE_MESSAGES: dict[str, StrOrPromise] = {
     "ama_number": gettext_lazy(
         "Enter the AMA number. A recorded number can be corrected, not removed."
     ),
+    "listing_text": gettext_lazy("Paste the text of your listing, not its link."),
 }
 
 
@@ -149,6 +151,11 @@ def describe(error: Exception) -> str:
         return str(CHANGE_THROUGH_THE_IKE.get(error.item, error))
     if isinstance(error, BankAccountAlreadyVerified):
         return _("The bank account is already verified.")
+    if isinstance(error, ListingNotRead):
+        return _(
+            "The assistant could not read your listing right now. Fill in the profile yourself, "
+            "or try again later."
+        )
     if isinstance(error, ConcurrencyError):
         return _("Someone else changed this in the meantime. Reload the page and try again.")
     return str(error)

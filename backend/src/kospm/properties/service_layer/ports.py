@@ -3,8 +3,18 @@
 import abc
 from uuid import UUID
 
+from kospm.properties.domain.listing import ListingDraft, ListingText
 from kospm.properties.domain.value_objects import AccountHolderName, Iban
 from kospm.shared.outbox.service_layer.ports import AbstractOutbox
+
+
+class ListingTextExtractor(abc.ABC):
+    """Reads an owner's listing text into a draft profile (DOMAIN §5): the Claude API in
+    production, a fake in tests. It only interprets text (DOMAIN §2.4) and never fetches."""
+
+    @abc.abstractmethod
+    def extract(self, listing: ListingText) -> ListingDraft:
+        """The draft read from `listing`; raises ListingNotRead when it cannot."""
 
 
 class BankAccountVerifier(abc.ABC):

@@ -43,6 +43,14 @@ PORTAL_CLIENT_IP_HEADER = ""
 PORTAL_UPLOAD_MAX_MB = 15
 DEFAULT_FROM_EMAIL = "KosPM <noreply@portal.test>"
 
+# Tests never call the Claude API, even when a developer's .env has a key.
+ANTHROPIC_API_KEY = ""
+LISTING_EXTRACTOR_MODEL = "claude-opus-5-5"
+LISTING_EXTRACTOR_EFFORT = "low"
+LISTING_EXTRACTOR_TIMEOUT_SECONDS = 60
+LISTING_TEXT_MAX_CHARS = 20_000
+LISTING_READINGS_PER_HOUR = 10
+
 DATABASES = {
     "default": {
         **env.db("DATABASE_URL", default="postgres://kospm:kospm@localhost:5432/kospm"),

@@ -16,6 +16,9 @@ dependencies = [
     "cryptography>=46",
     # IANA time zone database for zoneinfo("Europe/Athens"): Windows ships none.
     "tzdata>=2025.1",
+    # Claude API: reads an owner's pasted listing text into a draft profile (Phase 2b,
+    # ListingTextExtractor adapter; approved by Petros). 2.x is the SDK the adapter is written for.
+    "anthropic>=2.3,<3",
 ]
 
 [dependency-groups]
@@ -193,6 +196,7 @@ forbidden_modules = [
     "cryptography",
     "psycopg",
     "django_stubs_ext",
+    "anthropic",
     "kospm.bootstrap",
     # Shared infrastructure: the domain receives time and money as values, never the machinery.
     "kospm.shared.clock",
@@ -222,6 +226,7 @@ forbidden_modules = [
     "cryptography",
     "psycopg",
     "django_stubs_ext",
+    "anthropic",
     "kospm.bootstrap",
     "kospm.shared.adapters",
     "kospm.**.adapters",

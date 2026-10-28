@@ -30,6 +30,7 @@ from datetime import time, timedelta
 from decimal import Decimal
 from uuid import UUID
 
+import anthropic
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
@@ -43,11 +44,17 @@ from kospm.identity.service_layer import handlers as identity_handlers
 from kospm.identity.service_layer.ports import AccountTokens
 from kospm.identity.service_layer.unit_of_work import IdentityUnitOfWork
 from kospm.properties.adapters.bank_verification import ManualBankAccountVerifier
+from kospm.properties.adapters.listing_extractor import (
+    ClaudeListingExtractor,
+    UnavailableListingExtractor,
+)
 from kospm.properties.adapters.unit_of_work import DjangoPropertiesUnitOfWork
 from kospm.properties.domain.codes import PropertyCodeSeries
 from kospm.properties.domain.defaults import BankVerificationPolicy, PropertyDefaults
 from kospm.properties.domain.events import OwnerEmailChanged, OwnerRegistered
+from kospm.properties.domain.listing import ListingTextPolicy
 from kospm.properties.service_layer import handlers as properties_handlers
+from kospm.properties.service_layer.ports import ListingTextExtractor
 from kospm.shared.adapters.throttle import Throttle, ThrottlePolicy
 from kospm.shared.clock import Clock, SystemClock
 from kospm.shared.domain import Command, DomainEvent, Money, new_id
@@ -260,6 +267,58 @@ def _bank_verification_policy() -> BankVerificationPolicy:
         return BankVerificationPolicy(max_attempts=int(settings.BANK_VERIFICATION_MAX_ATTEMPTS))
     except ValueError as error:
         raise ImproperlyConfigured(f"invalid BANK_VERIFICATION_MAX_ATTEMPTS: {error}") from error
+
+
+# Listing text (design brief J6): a query the portal page runs itself, not a command on the bus.
+
+_EFFORTS = frozenset({"low", "medium", "high", "xhigh", "max"})
+
+
+def listing_extractor() -> ListingTextExtractor:
+    """Claude reads listing text when ANTHROPIC_API_KEY is set; without it the owner types."""
+    api_key = str(settings.ANTHROPIC_API_KEY)
+    if not api_key:
+        return UnavailableListingExtractor()
+    effort = str(settings.LISTING_EXTRACTOR_EFFORT)
+    try:
+        timeout = float(settings.LISTING_EXTRACTOR_TIMEOUT_SECONDS)
+    except (TypeError, ValueError) as error:
+        raise ImproperlyConfigured(f"invalid LISTING_EXTRACTOR_TIMEOUT_SECONDS: {error}") from error
+    if effort not in _EFFORTS or timeout <= 0:
+        raise ImproperlyConfigured(
+            f"invalid LISTING_EXTRACTOR_*: the effort is one of {sorted(_EFFORTS)}, "
+            "the timeout is a positive number of seconds"
+        )
+    return ClaudeListingExtractor(
+        client=_anthropic_client(api_key, timeout),
+        model=str(settings.LISTING_EXTRACTOR_MODEL),
+        effort=effort,
+    )
+
+
+@functools.lru_cache(maxsize=1)
+def _anthropic_client(api_key: str, timeout: float) -> anthropic.Anthropic:
+    """One client per process, so its connections are reused; a failed call is retried once."""
+    return anthropic.Anthropic(api_key=api_key, timeout=timeout, max_retries=1)
+
+
+def listing_text_policy() -> ListingTextPolicy:
+    """The longest listing text sent in one reading (LISTING_TEXT_MAX_CHARS)."""
+    try:
+        return ListingTextPolicy(max_characters=int(settings.LISTING_TEXT_MAX_CHARS))
+    except (TypeError, ValueError) as error:
+        raise ImproperlyConfigured(f"invalid LISTING_TEXT_MAX_CHARS: {error}") from error
+
+
+def listing_throttle() -> Throttle:
+    """The readings of listing text allowed per owner per hour (LISTING_READINGS_PER_HOUR)."""
+    try:
+        policy = ThrottlePolicy(
+            max_attempts=int(settings.LISTING_READINGS_PER_HOUR), window=timedelta(hours=1)
+        )
+    except (TypeError, ValueError) as error:
+        raise ImproperlyConfigured(f"invalid LISTING_READINGS_PER_HOUR: {error}") from error
+    return Throttle("listing", policy)
 
 
 # --- Identity (DOMAIN §5 owner portal, ADR 0017) ------------------------------------------------

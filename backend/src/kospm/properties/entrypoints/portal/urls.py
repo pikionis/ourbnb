@@ -18,6 +18,11 @@ urlpatterns = [
         name="property_profile",
     ),
     path(
+        "properties/<str:code>/listing/",
+        property_views.property_listing,
+        name="property_listing",
+    ),
+    path(
         "properties/<str:code>/contract/",
         property_views.property_contract,
         name="property_contract",
