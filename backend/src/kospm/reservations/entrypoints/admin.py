@@ -335,24 +335,41 @@ class CalendarFeedAdmin(_CommandsOnly[models.CalendarFeed]):
 
     @admin.action(description=gettext_lazy("Sync now"))
     def sync_now(self, request: HttpRequest, queryset: QuerySet[models.CalendarFeed]) -> None:
+        feeds = list(queryset)
         self._each(
             request,
             [
                 (str(feed), SyncCalendarFeed(property_id=feed.calendar_id, channel=feed.channel))
-                for feed in queryset
+                for feed in feeds
             ],
-            lambda count: (
-                ngettext("%(count)d calendar read.", "%(count)d calendars read.", count)
-                % {"count": count}
-            ),
+            lambda count: self._health_report(feeds),
         )
+
+    @staticmethod
+    def _health_report(feeds: list[models.CalendarFeed]) -> str:
+        """What the reads found, as the feeds' health now says (a failed read is no error)."""
+        failing = models.CalendarFeed.objects.filter(
+            pk__in=[feed.pk for feed in feeds], failing_since__isnull=False
+        ).count()
+        read = len(feeds) - failing
+        message = ngettext("%(count)d calendar read.", "%(count)d calendars read.", read) % {
+            "count": read
+        }
+        if failing:
+            message += " " + ngettext(
+                "%(count)d could not be read: see its health.",
+                "%(count)d could not be read: see their health.",
+                failing,
+            ) % {"count": failing}
+        return message
 
     @admin.action(description=gettext_lazy("Confirm that the calendar is empty"))
     def confirm_empty_calendar(
         self, request: HttpRequest, queryset: QuerySet[models.CalendarFeed]
     ) -> None:
+        feeds = list(queryset)
         commands: list[tuple[str, Command]] = []
-        for feed in queryset:
+        for feed in feeds:
             commands.append(
                 (
                     str(feed),
@@ -362,4 +379,4 @@ class CalendarFeedAdmin(_CommandsOnly[models.CalendarFeed]):
             commands.append(
                 (str(feed), SyncCalendarFeed(property_id=feed.calendar_id, channel=feed.channel))
             )
-        self._each(request, commands, lambda count: _("Confirmed: the calendars were read again."))
+        self._each(request, commands, lambda count: self._health_report(feeds))

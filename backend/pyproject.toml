@@ -203,6 +203,8 @@ forbidden_modules = [
     "psycopg",
     "django_stubs_ext",
     "anthropic",
+    "icalendar",
+    "httpx2",
     "kospm.bootstrap",
     # Shared infrastructure: the domain receives time and money as values, never the machinery.
     "kospm.shared.clock",
@@ -217,12 +219,13 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "Only adapters and bootstrap talk to the Claude API"
+name = "Only adapters and bootstrap use the outside services' libraries"
 type = "forbidden"
-# Pages and models reach Claude through a port (ListingTextExtractor) that bootstrap wires: the
-# indirect import through bootstrap is expected, a direct one is not.
+# Pages and models reach Claude and the calendar feeds through ports (ListingTextExtractor,
+# ICalFetcher, ICalParser) that bootstrap wires: the indirect import through bootstrap is
+# expected, a direct one is not.
 source_modules = ["kospm.**.entrypoints", "kospm.**.models", "kospm.shared"]
-forbidden_modules = ["anthropic"]
+forbidden_modules = ["anthropic", "icalendar", "httpx2"]
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
@@ -242,6 +245,8 @@ forbidden_modules = [
     "psycopg",
     "django_stubs_ext",
     "anthropic",
+    "icalendar",
+    "httpx2",
     "kospm.bootstrap",
     "kospm.shared.adapters",
     "kospm.**.adapters",

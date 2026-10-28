@@ -1,15 +1,17 @@
 """iCalendar adapters of the reservations context (DOMAIN §6, ADR 0012: iCal is an allowed source).
 
 - ICalendarParser reads a feed with the `icalendar` library and classifies each event with its
-  channel's rules (CLASSIFIERS). Only the UID, dates, kind and confirmation code are kept.
+  channel's rules (CLASSIFIERS). Only the UID, dates, kind and confirmation code are kept. An event
+  it cannot read makes the whole feed unreadable: skipped, its reservation would be cancelled.
 - HttpICalFetcher reads a feed over HTTPS; FileICalFetcher reads it from files (tests, trials).
 
-A feed's URL carries a secret token: errors name their kind, never the URL.
+A feed's URL carries a secret token: errors name their kind, never the URL, and it never travels
+over plain http.
 """
 
 import hashlib
-import logging
 import re
+import time
 from collections.abc import Callable, Mapping
 from datetime import date, datetime
 from pathlib import Path
@@ -18,7 +20,7 @@ from typing import Any
 import httpx2
 import icalendar
 
-from kospm.reservations.domain.errors import InvalidValue
+from kospm.reservations import models
 from kospm.reservations.domain.value_objects import (
     Channel,
     EventKind,
@@ -33,11 +35,14 @@ from kospm.reservations.service_layer.ports import (
 )
 from kospm.shared.domain import athens_date
 
-logger = logging.getLogger(__name__)
-
 type Classifier = Callable[[str, str], tuple[EventKind, str]]
 
 _AIRBNB_CODE = re.compile(r"/reservations/details/([A-Z0-9]{6,20})")
+# What the tables can hold. A longer UID makes the feed unreadable; a longer ETag or Last-Modified
+# is dropped (the server is then asked for the whole feed every time).
+MAX_UID = models.Reservation._meta.get_field("external_uid").max_length or 255
+MAX_ETAG = models.CalendarFeed._meta.get_field("etag").max_length or 255
+MAX_LAST_MODIFIED = models.CalendarFeed._meta.get_field("last_modified").max_length or 64
 
 
 def classify_airbnb(summary: str, description: str) -> tuple[EventKind, str]:
@@ -73,23 +78,22 @@ class ICalendarParser(ICalParser):
         if getattr(calendar, "name", None) != "VCALENDAR":
             raise FeedUnreadable("not an iCalendar file")
         classify = CLASSIFIERS[Channel(channel)]
-        events = (_event(component, classify) for component in calendar.walk("VEVENT"))
-        return [event for event in events if event is not None]
+        return [_event(component, classify) for component in calendar.walk("VEVENT")]
 
 
-def _event(component: Any, classify: Classifier) -> ImportedCalendarEvent | None:
-    """One event, or None for an event without a UID or valid dates (skipped, logged)."""
-    uid = str(component.get("UID", "")).strip()
-    start, end = component.get("DTSTART"), component.get("DTEND")
-    if not uid or start is None or end is None:
-        logger.warning("a calendar event without a UID or dates was skipped")
-        return None
+def _event(component: Any, classify: Classifier) -> ImportedCalendarEvent:
+    """One event, read whole or not at all (DOMAIN §6: a failed read changes nothing). Its end is
+    DTEND, or DTSTART plus DURATION; an all-day event with neither lasts one day (RFC 5545)."""
     try:
-        dates = StayDates(_day(start.dt), _day(end.dt))
-    except InvalidValue:
-        logger.warning("calendar event %s ends before it starts: skipped", uid)
-        return None
-    kind, code = classify(str(component.get("SUMMARY", "")), str(component.get("DESCRIPTION", "")))
+        uid = str(component.get("UID", "")).strip()
+        if not uid or len(uid) > MAX_UID:
+            raise ValueError("no usable UID")
+        dates = StayDates(_day(component.start), _day(component.end))
+        summary = str(component.get("SUMMARY", ""))
+        description = str(component.get("DESCRIPTION", ""))
+    except Exception as error:  # data from outside: any surprise means an unreadable feed
+        raise FeedUnreadable(f"a calendar event cannot be read ({type(error).__name__})") from None
+    kind, code = classify(summary, description)
     return ImportedCalendarEvent(uid=uid, dates=dates, kind=kind, confirmation_code=code)
 
 
@@ -101,18 +105,31 @@ def _day(value: date | datetime) -> date:
 
 
 class HttpICalFetcher(ICalFetcher):
-    """Reads a feed over HTTPS, with a timeout and a size limit. It asks "not modified" with the
-    ETag and Last-Modified of the last accepted read."""
+    """Reads a feed over HTTPS:
+    - every request goes over https, redirects included: one to http is refused before it is sent;
+    - a timeout for each wait, a deadline for the whole feed and a size limit;
+    - "not modified" is asked with the ETag and Last-Modified of the last accepted read;
+    - no cookie goes from one feed to the next.
+    """
 
     def __init__(
-        self, *, timeout: float, max_bytes: int, client: httpx2.Client | None = None
+        self,
+        *,
+        timeout: float,
+        max_bytes: int,
+        client: httpx2.Client | None = None,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         self._client = client or httpx2.Client(
             timeout=timeout,
             follow_redirects=True,
             headers={"User-Agent": "KosPM calendar sync"},
         )
+        hooks = self._client.event_hooks
+        self._client.event_hooks = {**hooks, "request": [*hooks.get("request", []), _https_only]}
         self._max_bytes = max_bytes
+        self._deadline = 3 * timeout  # a server sending a few bytes at a time
+        self._monotonic = monotonic
 
     def fetch(self, url: str, *, etag: str = "", last_modified: str = "") -> FetchedFeed:
         if not url.startswith("https://"):
@@ -120,10 +137,10 @@ class HttpICalFetcher(ICalFetcher):
         headers = {"If-None-Match": etag} if etag else {}
         if last_modified:
             headers["If-Modified-Since"] = last_modified
+        self._client.cookies.clear()
+        started = self._monotonic()
         try:
             with self._client.stream("GET", url, headers=headers) as response:
-                if response.url.scheme != "https":
-                    raise FeedUnreadable("redirected away from https")
                 if response.status_code == 304:
                     return FetchedFeed(content=None, etag=etag, last_modified=last_modified)
                 if response.status_code != 200:
@@ -133,14 +150,28 @@ class HttpICalFetcher(ICalFetcher):
                     content.extend(chunk)
                     if len(content) > self._max_bytes:
                         raise FeedUnreadable(f"larger than {self._max_bytes} bytes")
+                    if self._monotonic() - started > self._deadline:
+                        raise FeedUnreadable("the server sends too slowly")
                 return FetchedFeed(
                     content=bytes(content),
-                    etag=response.headers.get("ETag", ""),
-                    last_modified=response.headers.get("Last-Modified", ""),
+                    etag=_fitting(response.headers.get("ETag", ""), MAX_ETAG),
+                    last_modified=_fitting(
+                        response.headers.get("Last-Modified", ""), MAX_LAST_MODIFIED
+                    ),
                 )
         except (httpx2.HTTPError, httpx2.InvalidURL) as error:
             # `from None`: the library's message and traceback hold the URL.
             raise FeedUnreadable(type(error).__name__) from None
+
+
+def _https_only(request: httpx2.Request) -> None:
+    """Called before every request, redirects included: the URL carries a secret token."""
+    if request.url.scheme != "https":
+        raise FeedUnreadable("redirected away from https")
+
+
+def _fitting(value: str, limit: int) -> str:
+    return value if len(value) <= limit else ""
 
 
 class FileICalFetcher(ICalFetcher):

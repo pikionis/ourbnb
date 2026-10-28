@@ -15,7 +15,16 @@ from kospm.shared.clock import FixedClock
 from kospm.shared.domain import new_id
 from kospm.shared.outbox.adapters import DjangoOutbox
 from kospm.shared.unit_of_work import ConcurrencyError
-from tests.unit.reservations.builders import NOW, POLICY, PROPERTY_ID, TODAY, calendar, event, stay
+from tests.unit.reservations.builders import (
+    AIRBNB_URL,
+    NOW,
+    POLICY,
+    PROPERTY_ID,
+    TODAY,
+    calendar,
+    event,
+    stay,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -121,6 +130,64 @@ class TestCalendarRepository:
         assert version() == 0
         feed = models.CalendarFeed.objects.get(calendar_id=PROPERTY_ID, channel="airbnb")
         assert feed.last_synced_at == later  # still shown to the admin
+
+    def test_a_new_etag_alone_keeps_the_version(self) -> None:
+        subject = calendar()
+        subject.read_feed(
+            Channel.AIRBNB, [event("a", "07-12", "07-15")], today=TODAY, now=NOW, policy=POLICY
+        )
+        stored(subject)
+        uow = new_uow()
+        with uow:
+            uow.calendars.get(PROPERTY_ID).read_feed(
+                Channel.AIRBNB,
+                [event("a", "07-12", "07-15")],
+                today=TODAY,
+                now=NOW,
+                policy=POLICY,
+                etag='"v2"',
+            )
+            uow.commit()
+        assert version() == 0
+        assert models.CalendarFeed.objects.get(channel="airbnb").etag == '"v2"'
+
+    def test_child_rows_keep_their_keys_across_writes(self) -> None:
+        # The admin's actions and links name rows by key: a sync in between must not change it.
+        subject = calendar()
+        subject.read_feed(
+            Channel.BOOKING,
+            [event("u", "08-01", "08-03", kind=EventKind.UNKNOWN)],
+            today=TODAY,
+            now=NOW,
+            policy=POLICY,
+        )
+        stored(subject)
+        keys = (
+            set(models.CalendarFeed.objects.values_list("pk", flat=True)),
+            set(models.WaitingCalendarEvent.objects.values_list("pk", flat=True)),
+        )
+        uow = new_uow()
+        with uow:
+            uow.calendars.get(PROPERTY_ID).read_feed(
+                Channel.AIRBNB, [event("a", "07-12", "07-15")], today=TODAY, now=NOW, policy=POLICY
+            )
+            uow.commit()
+        assert version() == 1
+        assert keys == (
+            set(models.CalendarFeed.objects.values_list("pk", flat=True)),
+            set(models.WaitingCalendarEvent.objects.values_list("pk", flat=True)),
+        )
+
+    def test_a_read_of_an_old_link_never_marks_the_new_one_read(self) -> None:
+        stored()
+        uow = new_uow()
+        with uow:
+            loaded = uow.calendars.get(PROPERTY_ID)
+            # The admin gives the feed a new link while this read of the old one is applied.
+            models.CalendarFeed.objects.filter(channel="airbnb").update(url=AIRBNB_URL + "&new")
+            loaded.feed_unchanged(Channel.AIRBNB, now=NOW)
+            uow.commit()
+        assert models.CalendarFeed.objects.get(channel="airbnb").last_synced_at is None
 
     def test_a_unit_that_only_reads_writes_nothing(self) -> None:
         stored()

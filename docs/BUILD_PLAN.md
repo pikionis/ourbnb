@@ -180,13 +180,13 @@ Domain:
       properties.
 - [x] Events `ReservationImported`, `ReservationRescheduled`, `ReservationCancelled`, `StayEnded`,
       `CalendarEventNeedsReview`, `CalendarFeedFailing`.
-- [x] `CalendarDiff` domain service: given stored reservations and imported events → list of events
+- [x] `CalendarDiff` domain service (`calendar_diff`): given stored reservations and imported events → list of events
       (new / rescheduled / cancelled). Pure function, heavily unit-tested.
 
 Adapters:
 - [x] `ICalFetcher` port; `HttpICalFetcher` (httpx2, timeout, ETag support) and `FileICalFetcher` (tests).
 - [x] `ICalParser` (library `icalendar`) → `ImportedCalendarEvent`; per-channel classifiers
-      (`AirbnbClassifier`, `BookingClassifier`) deciding reservation vs block vs unknown. An unknown
+      (`classify_airbnb`, `classify_booking`) deciding reservation vs block vs unknown. An unknown
       event that mirrors another channel's reservation is a block; the admin's answers are
       remembered by UID.
 - [x] Admin alerts (feed failing, event to review, overlap) by WhatsApp to `ADMIN_WHATSAPP_NUMBER`

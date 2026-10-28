@@ -34,9 +34,6 @@ msgstr "Επιλέξτε Airbnb ή Booking.com."
 msgid "Confirm that the calendar is empty"
 msgstr "Επιβεβαίωση ότι το ημερολόγιο είναι κενό"
 
-msgid "Confirmed: the calendars were read again."
-msgstr "Επιβεβαιώθηκε· τα ημερολόγια διαβάστηκαν ξανά."
-
 msgid "Empty calendar confirmed"
 msgstr "Επιβεβαιωμένο κενό ημερολόγιο"
 
@@ -101,6 +98,11 @@ msgid "%(count)d answer saved."
 msgid_plural "%(count)d answers saved."
 msgstr[0] "Αποθηκεύτηκε %(count)d απάντηση."
 msgstr[1] "Αποθηκεύτηκαν %(count)d απαντήσεις."
+
+msgid "%(count)d could not be read: see its health."
+msgid_plural "%(count)d could not be read: see their health."
+msgstr[0] "%(count)d δεν διαβάστηκε: δείτε την κατάστασή του."
+msgstr[1] "%(count)d δεν διαβάστηκαν: δείτε την κατάστασή τους."
 
 msgid "%(count)d calendar read."
 msgid_plural "%(count)d calendars read."

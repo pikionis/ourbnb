@@ -161,7 +161,12 @@ class ReservationCalendar(Aggregate[UUID]):
 
     def update_settings(self, details: PropertyDetails, feeds: Mapping[Channel, str]) -> None:
         """A feed with a new URL starts a new history. A removed feed's reservations stay;
-        its waiting events go."""
+        its waiting events go. A property active again starts its feeds' health afresh."""
+        if details.active and not self.details.active:
+            self._feeds = {
+                channel: replace(feed, failing_since=None, alerted=False)
+                for channel, feed in self._feeds.items()
+            }
         self.details = details
         for channel, url in feeds.items():
             current = self._feeds.get(Channel(channel))
@@ -226,17 +231,22 @@ class ReservationCalendar(Aggregate[UUID]):
                 waiting.append(_waiting(channel, event, ReviewReason.OVERLAP))
             else:
                 self._reschedule(
-                    reservation, event.dates, reservation.check_in_time, reservation.check_out_time
+                    reservation,
+                    event.dates,
+                    reservation.check_in_time,
+                    reservation.check_out_time,
+                    today=today,
                 )
         for event in changes.new:
             self._import(channel, event, today, waiting)
         self._replace_waiting(channel, waiting)
 
     def feed_unchanged(self, channel: Channel, *, now: datetime) -> None:
-        """The server answered "not modified": a successful read that changes nothing."""
+        """The server answered "not modified": a successful read that changes nothing. The
+        feed has its earlier content again, so an empty-calendar confirmation no longer holds."""
         feed = self.feed(channel)
         self._feeds[feed.channel] = replace(
-            feed, failing_since=None, alerted=False, last_synced_at=now
+            feed, failing_since=None, alerted=False, accept_empty=False, last_synced_at=now
         )
 
     def feed_failed(self, channel: Channel, *, now: datetime, policy: FeedHealthPolicy) -> None:
@@ -326,6 +336,7 @@ class ReservationCalendar(Aggregate[UUID]):
         check_in_time: time,
         check_out_time: time,
         guest_name: str,
+        today: date,
     ) -> None:
         """The admin's edit: times and guest name; the dates of a DIRECT reservation only."""
         reservation = self._confirmed_reservation(reservation_id)
@@ -334,7 +345,7 @@ class ReservationCalendar(Aggregate[UUID]):
                 raise ChangeOnThePlatform(reservation.channel.value)
             self.accept(dates, except_id=reservation.id)
         reservation.guest_name = guest_name.strip()
-        self._reschedule(reservation, dates, check_in_time, check_out_time)
+        self._reschedule(reservation, dates, check_in_time, check_out_time, today=today)
 
     def cancel_direct_reservation(self, reservation_id: UUID) -> None:
         reservation = self._confirmed_reservation(reservation_id)
@@ -446,11 +457,21 @@ class ReservationCalendar(Aggregate[UUID]):
             )
 
     def _reschedule(
-        self, reservation: Reservation, dates: StayDates, check_in_time: time, check_out_time: time
+        self,
+        reservation: Reservation,
+        dates: StayDates,
+        check_in_time: time,
+        check_out_time: time,
+        *,
+        today: date,
     ) -> None:
+        """New dates or times. A stay that ended and now leaves later (the guests extend it)
+        has not ended any more: its StayEnded comes again on the new check-out date."""
         before = (reservation.dates, reservation.check_in_time, reservation.check_out_time)
         if before == (dates, check_in_time, check_out_time):
             return
+        if reservation.stay_ended and dates.check_out > today:
+            reservation.stay_ended = False
         reservation.dates = dates
         reservation.check_in_time, reservation.check_out_time = check_in_time, check_out_time
         self.events.append(
@@ -491,6 +512,8 @@ class ReservationCalendar(Aggregate[UUID]):
         """The admin is told once about each waiting event (and again if its dates change)."""
         known = {(event.uid, event.reason, event.dates) for event in already}
         for event in waiting:
+            if any(w.channel is event.channel and w.uid == event.uid for w in self._waiting):
+                continue  # listed twice in the feed: it waits once
             if (event.uid, event.reason, event.dates) not in known:
                 self.events.append(
                     CalendarEventNeedsReview(

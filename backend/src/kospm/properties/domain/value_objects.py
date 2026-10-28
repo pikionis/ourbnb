@@ -183,7 +183,8 @@ class IcalFeed:
             ) from error
         url = self.url.strip()
         if not _HTTPS_URL.fullmatch(url):
-            raise InvalidValue(f"{self.url!r} is not an https address", field="ical_feeds")
+            # Never the URL itself in the message: a calendar link holds a secret token.
+            raise InvalidValue("a calendar link is an https address", field="ical_feeds")
         _set(self, "url", url)
 
 

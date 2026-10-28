@@ -2,6 +2,7 @@
 ch. 5): properties' announcements, feed syncs, the admin's commands and alerts."""
 
 import logging
+from dataclasses import replace
 from datetime import UTC, datetime, time, timedelta
 from typing import Any
 
@@ -20,6 +21,7 @@ from kospm.reservations.domain.commands import (
     UpdatePropertyCalendar,
 )
 from kospm.reservations.domain.errors import CalendarNotFound, InvalidValue
+from kospm.reservations.domain.events import CalendarEventNeedsReview, CalendarFeedFailing
 from kospm.reservations.domain.policies import FeedHealthPolicy
 from kospm.reservations.domain.value_objects import Channel, EventKind
 from kospm.reservations.service_layer.handlers import COMMAND_HANDLERS, EVENT_HANDLERS
@@ -36,17 +38,18 @@ from tests.unit.reservations.fakes import (
 )
 
 NOW = datetime(2026, 7, 10, 6, 0, tzinfo=UTC)  # 09:00 in Athens
+LATE = datetime(2026, 7, 9, 22, 30, tzinfo=UTC)  # already 10 July in Athens
 ADMIN = "+306900000000"
 
 
 class Harness:
     """A bus wired with the reservations handlers, a fake Unit of Work and fake feeds."""
 
-    def __init__(self, *, admin_whatsapp: str = ADMIN) -> None:
+    def __init__(self, *, admin_whatsapp: str = ADMIN, now: datetime = NOW) -> None:
         self.uow = FakeReservationsUnitOfWork()
         self.fetcher = FakeICalFetcher()
         self.parser = FakeICalParser()
-        self.clock = FixedClock(NOW)
+        self.clock = FixedClock(now)
         self.bus: MessageBus = bootstrap(
             clock=self.clock,
             contexts=[
@@ -172,6 +175,59 @@ class TestSync:
         assert "KOS-001" in caplog.text
         assert AIRBNB_URL not in caplog.text
 
+    def test_a_link_changed_during_the_fetch_waits_for_the_next_sync(
+        self, harness: Harness
+    ) -> None:
+        harness.property_announced()
+        harness.feed(AIRBNB_URL, b"airbnb-1", event("a", "07-12", "07-15"))
+        calendar = harness.calendar()
+        harness.fetcher.while_fetching = lambda: calendar.update_settings(
+            calendar.details, {Channel.AIRBNB: AIRBNB_URL + "&new"}
+        )
+
+        harness.sync()
+
+        assert harness.confirmed_uids() == set()
+
+    def test_a_property_deactivated_during_the_fetch_is_not_changed(self, harness: Harness) -> None:
+        harness.property_announced()
+        harness.feed(AIRBNB_URL, b"airbnb-1", event("a", "07-12", "07-15"))
+        calendar = harness.calendar()
+        feeds = {feed.channel: feed.url for feed in calendar.feeds}
+        harness.fetcher.while_fetching = lambda: calendar.update_settings(
+            replace(calendar.details, active=False), feeds
+        )
+
+        harness.sync()
+
+        assert harness.confirmed_uids() == set()
+
+    def test_an_older_read_never_overwrites_a_newer_one(self, harness: Harness) -> None:
+        # E.g. the admin's "sync now" applied a newer read while this one was being fetched.
+        harness.property_announced()
+        harness.feed(AIRBNB_URL, b"airbnb-1", event("a", "07-12", "07-15"))
+        calendar = harness.calendar()
+        harness.fetcher.while_fetching = lambda: calendar.feed_unchanged(
+            Channel.AIRBNB, now=NOW + timedelta(minutes=1)
+        )
+
+        harness.sync()
+
+        assert harness.confirmed_uids() == set()
+
+    def test_the_sync_reasons_in_athens_dates(self) -> None:
+        harness = Harness(now=LATE)
+        harness.property_announced()
+        harness.feed(
+            AIRBNB_URL, b"airbnb-1", event("a", "07-10", "07-12"), event("b", "07-20", "07-22")
+        )
+        harness.sync()
+        harness.feed(AIRBNB_URL, b"airbnb-2", event("b", "07-20", "07-22"))
+
+        harness.sync()  # "a" starts today in Athens (not tomorrow): its feed never cancels it
+
+        assert harness.confirmed_uids() == {"a", "b"}
+
     def test_an_inactive_property_is_not_fetched(self, harness: Harness) -> None:
         harness.property_announced(active=False)
         harness.sync()
@@ -214,6 +270,22 @@ class TestAlerts:
             "dates": "20/07-22/07",
             "reason": "unknown",
         }
+
+    def test_the_alert_is_queued_in_the_syncs_own_unit(self, harness: Harness) -> None:
+        # Never in a later unit: if that one failed, the incident (marked alerted) would never
+        # alert again (ADR 0005: queued in the same transaction).
+        assert CalendarFeedFailing not in EVENT_HANDLERS
+        assert CalendarEventNeedsReview not in EVENT_HANDLERS
+        harness.property_announced()
+        harness.feed(
+            BOOKING_URL, b"booking-1", event("b", "07-20", "07-22", kind=EventKind.UNKNOWN)
+        )
+        before = harness.uow.committed
+
+        harness.sync("booking")
+
+        assert harness.uow.committed == before + 1
+        assert len(harness.whatsapp_sent) == 1
 
     def test_without_an_admin_number_no_message_is_queued(self) -> None:
         harness = Harness(admin_whatsapp="")
@@ -298,8 +370,8 @@ class TestTheAdmin:
         assert not reservation.confirmed
         assert harness.uow.calendars.expected_versions[-3:] == [1, 2, 3]
 
-    def test_stays_end_on_the_athens_date(self, harness: Harness) -> None:
-        # The clock says 06:00 UTC, already 10 July in Athens: stays leaving that day end.
+    def test_stays_end_on_the_athens_date(self) -> None:
+        harness = Harness(now=LATE)  # 22:30 UTC on 9 July: already 10 July in Athens
         harness.property_announced()
         harness.bus.handle(
             AddDirectReservation(

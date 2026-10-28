@@ -291,6 +291,31 @@ class TestUnknownEvents:
         assert read(subject, BOOKING, event("mirror", "07-12", "07-15", kind=UNKNOWN)) == []
         assert subject.waiting == ()
 
+    def test_the_mirror_rule_is_across_channels_only(self) -> None:
+        subject = calendar()
+        read(subject, BOOKING, event("b", "07-20", "07-22", kind=UNKNOWN))
+        subject.decide(BOOKING, "b", EventKind.RESERVATION, today=TODAY)
+
+        read(
+            subject,
+            BOOKING,
+            event("b", "07-20", "07-22", kind=UNKNOWN),
+            event("c", "07-20", "07-22", kind=UNKNOWN),  # same channel, same dates: no mirror
+        )
+
+        assert [(w.uid, w.reason) for w in subject.waiting] == [("c", ReviewReason.UNKNOWN)]
+
+    def test_a_uid_listed_twice_waits_once(self) -> None:
+        subject = calendar()
+        raised = read(
+            subject,
+            BOOKING,
+            event("b", "07-20", "07-22", kind=UNKNOWN),
+            event("b", "07-20", "07-22", kind=UNKNOWN),
+        )
+        assert len(subject.waiting) == 1
+        assert len(raised) == 1
+
     def test_an_unknown_event_of_a_stay_that_has_ended_is_not_asked_about(self) -> None:
         subject = calendar()
         assert read(subject, BOOKING, event("old", "07-01", "07-05", kind=UNKNOWN)) == []
@@ -375,6 +400,30 @@ class TestFeedHealth:
         assert not subject.feed(AIRBNB).failing
         assert subject.feed(AIRBNB).last_synced_at == NOW + timedelta(minutes=30)
 
+    def test_not_modified_ends_the_incident_and_a_new_one_alerts_again(self) -> None:
+        subject = calendar()
+        for hours in (0, 2):
+            subject.feed_failed(AIRBNB, now=NOW + timedelta(hours=hours), policy=POLICY)
+        subject.feed_unchanged(AIRBNB, now=NOW + timedelta(hours=3))
+        subject.events.clear()
+
+        later = NOW + timedelta(hours=10)
+        for hours in (0, 2):
+            subject.feed_failed(AIRBNB, now=later + timedelta(hours=hours), policy=POLICY)
+
+        assert subject.events == [
+            CalendarFeedFailing(property_id=PROPERTY_ID, channel="airbnb", since=later)
+        ]
+
+    def test_not_modified_disarms_the_empty_calendar_confirmation(self) -> None:
+        # The feed has its earlier content again: a later empty read is a failure, as before.
+        subject = calendar()
+        read(subject, AIRBNB, event("a", "07-12", "07-15"))
+        subject.confirm_empty_calendar(AIRBNB)
+        subject.feed_unchanged(AIRBNB, now=NOW)
+        read(subject, AIRBNB)
+        assert set(by_uid(subject)) == {"a"}
+
     def test_the_admin_confirms_an_empty_calendar(self) -> None:
         subject = calendar()
         read(subject, AIRBNB, event("a", "07-12", "07-15"), event("past", "07-01", "07-05"))
@@ -437,6 +486,7 @@ class TestTheAdmin:
             check_in_time=time(13),
             check_out_time=time(11),
             guest_name="Anna",
+            today=TODAY,
         )
 
         assert (reservation.check_in_time, reservation.guest_name) == (time(13), "Anna")
@@ -458,6 +508,7 @@ class TestTheAdmin:
             check_in_time=time(15),
             check_out_time=time(11),
             guest_name="Anna",
+            today=TODAY,
         )
         assert subject.events == []
 
@@ -472,6 +523,7 @@ class TestTheAdmin:
                 check_in_time=time(15),
                 check_out_time=time(11),
                 guest_name="",
+                today=TODAY,
             )
         with pytest.raises(ChangeOnThePlatform):
             subject.cancel_direct_reservation(reservation.id)
@@ -490,6 +542,7 @@ class TestTheAdmin:
                 check_in_time=time(15),
                 check_out_time=time(11),
                 guest_name="",
+                today=TODAY,
             )
         subject.change_reservation(
             reservation_id,
@@ -497,6 +550,7 @@ class TestTheAdmin:
             check_in_time=time(15),
             check_out_time=time(11),
             guest_name="",
+            today=TODAY,
         )
         subject.cancel_direct_reservation(reservation_id)
 
@@ -531,6 +585,23 @@ class TestStayEnded:
             StayEnded(reservation_id=reservation.id, property_id=PROPERTY_ID, check_out_date=TODAY)
         ]
 
+    def test_a_stay_extended_after_it_ended_ends_again_on_its_new_date(self) -> None:
+        subject = calendar()
+        read(subject, AIRBNB, event("a", "07-08", "07-10"), today=day("07-07"))
+        subject.end_stays(TODAY)  # 12:00: the guests leave today
+        read(subject, AIRBNB, event("a", "07-08", "07-12"))  # 12:30: they stay two more nights
+        reservation = the(subject, "a")
+        assert not reservation.stay_ended
+        subject.events.clear()
+
+        subject.end_stays(day("07-12"))
+
+        assert subject.events == [
+            StayEnded(
+                reservation_id=reservation.id, property_id=PROPERTY_ID, check_out_date=day("07-12")
+            )
+        ]
+
     def test_a_missed_day_is_caught_up(self) -> None:
         subject = calendar()
         read(subject, AIRBNB, event("a", "07-05", "07-08"), today=day("07-04"))
@@ -562,6 +633,18 @@ class TestSettings:
 
         assert subject.feed(AIRBNB) == Feed(AIRBNB, AIRBNB_URL + "&new")
         assert subject.feed(BOOKING).url == "https://b.example/1"
+
+    def test_reactivation_starts_the_feeds_health_afresh(self) -> None:
+        subject = calendar()
+        for hours in (0, 2):
+            subject.feed_failed(AIRBNB, now=NOW + timedelta(hours=hours), policy=POLICY)
+        feeds = {AIRBNB: AIRBNB_URL, BOOKING: subject.feed(BOOKING).url}
+        subject.update_settings(replace(DETAILS, active=False), feeds)
+
+        subject.update_settings(DETAILS, feeds)
+
+        assert not subject.feed(AIRBNB).failing
+        assert not subject.feed(AIRBNB).alerted
 
     def test_the_same_url_keeps_its_history(self) -> None:
         subject = calendar()

@@ -46,6 +46,8 @@ class ReservationForm(forms.ModelForm[models.Reservation]):
             self.initial.setdefault("version", self.instance.calendar.version)
             if self.instance.channel != Channel.DIRECT:
                 for name in DATE_FIELDS:
+                    if name not in self.fields:
+                        continue  # a cancelled reservation's page shows no form fields
                     self.fields[name].disabled = True
                     self.fields[name].help_text = _("From the platform's calendar.")
 
@@ -53,6 +55,7 @@ class ReservationForm(forms.ModelForm[models.Reservation]):
         data = super().clean() or {}
         if self.errors:
             return data  # judge the whole only when every value is valid
+        today = SystemClock().today_athens()
         try:
             dates = StayDates(data["check_in_date"], data["check_out_date"])
             if self.adding:
@@ -60,7 +63,7 @@ class ReservationForm(forms.ModelForm[models.Reservation]):
                 calendar.add_direct_reservation(
                     new_id(),
                     dates=dates,
-                    today=SystemClock().today_athens(),
+                    today=today,
                     guest_name=data.get("guest_name", ""),
                     check_in_time=data.get("check_in_time"),
                     check_out_time=data.get("check_out_time"),
@@ -73,6 +76,7 @@ class ReservationForm(forms.ModelForm[models.Reservation]):
                     check_in_time=data["check_in_time"],
                     check_out_time=data["check_out_time"],
                     guest_name=data.get("guest_name", ""),
+                    today=today,
                 )
         except InvalidValue as error:
             field = "check_out_date" if error.field == "dates" else None

@@ -396,6 +396,25 @@ stay whose check-out date has come, so a day the job missed is caught up.
 - **Reappearing UID.** The UID of a cancelled reservation that comes back in the feed is a new
   reservation.
 - **Event times.** A feed event with a time, not just a date, takes its date in Athens.
+- **Unreadable events.** An event with no UID or no valid dates makes its feed's read fail:
+  nothing changes, and the admin is alerted after the threshold. Skipped instead, its
+  reservation would be cancelled.
+  - An event may give its length (DURATION) instead of its end.
+  - An all-day event with neither lasts one day (RFC 5545).
+- **Long validators.** An ETag or Last-Modified too long to store is ignored, and the feed is then
+  read whole every time.
+- **Stale reads.** A read is applied only if, while it was fetched:
+  - the property stayed active;
+  - the feed kept its link;
+  - no newer read was applied, e.g. the admin's "sync now".
+- **Extended stays.** A stay that ended and is then extended on its platform has not ended any
+  more: StayEnded is raised again on its new check-out date.
+- **Reactivation.** A property that becomes active again starts its feeds' health afresh: an old
+  incident never silences a new one.
+- **"Not modified".** A "not modified" answer withdraws the admin's empty-calendar confirmation,
+  since the feed has its earlier content again.
+- **History.** Stays that ended before KosPM learned of them are recorded as history, without the
+  overlap check.
 
 ---
 

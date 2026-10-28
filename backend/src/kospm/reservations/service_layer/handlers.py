@@ -3,10 +3,14 @@
 Each handler runs one Unit of Work over one ReservationCalendar. Dependencies besides `uow` and
 `clock` are injected by bootstrap by name: `ical_fetcher`, `ical_parser`, `feed_health` (policy)
 and `admin_alerts`. "Today" is always the Athens date of the injected clock (DOMAIN §2.6).
+
+The admin's alerts are queued in the unit that raised them, not by a later event handler: the
+alert and the state that records it ("alerted") commit together or not at all (ADR 0005).
 """
 
 import logging
 from collections.abc import Callable
+from datetime import datetime
 
 from kospm.reservations.domain.calendar import Feed, PropertyDetails, ReservationCalendar
 from kospm.reservations.domain.commands import (
@@ -75,9 +79,13 @@ def sync_calendar_feed(
     ical_fetcher: ICalFetcher,
     ical_parser: ICalParser,
     feed_health: FeedHealthPolicy,
+    admin_alerts: AdminAlerts,
 ) -> None:
-    """Read one channel's feed and apply it. The network is read between two units, never
-    inside a database transaction; a feed that changed its URL meanwhile waits for the next sync.
+    """Read one channel's feed and apply it.
+
+    The network is read between two units, never inside a database transaction. The read is
+    applied only if nothing changed meanwhile that makes it stale: the property is still active,
+    the feed still has this URL, and no newer read was applied (e.g. the admin's "sync now").
     """
     channel = _channel(cmd.channel)
     with uow:  # read only: nothing to commit
@@ -85,10 +93,11 @@ def sync_calendar_feed(
         if not calendar.syncs:
             return
         feed, code = calendar.feed(channel), calendar.details.code
+    started = clock.now()
     read = _read(feed, code, ical_fetcher, ical_parser)
     with uow:
         calendar = uow.calendars.get(cmd.property_id)
-        if calendar.feed(channel).url != feed.url:
+        if _stale(calendar, feed, started):
             return
         now = clock.now()
         if read is None:
@@ -105,7 +114,18 @@ def sync_calendar_feed(
                 etag=read[0].etag,
                 last_modified=read[0].last_modified,
             )
+        _alert_admin(calendar, uow, admin_alerts)
         uow.commit()
+
+
+def _stale(calendar: ReservationCalendar, fetched: Feed, started: datetime) -> bool:
+    current = next((feed for feed in calendar.feeds if feed.channel is fetched.channel), None)
+    return (
+        not calendar.syncs
+        or current is None
+        or current.url != fetched.url
+        or (current.last_synced_at is not None and current.last_synced_at > started)
+    )
 
 
 def _read(
@@ -132,12 +152,16 @@ def confirm_empty_calendar(cmd: ConfirmEmptyCalendar, uow: ReservationsUnitOfWor
 
 
 def decide_calendar_event(
-    cmd: DecideCalendarEvent, uow: ReservationsUnitOfWork, clock: Clock
+    cmd: DecideCalendarEvent,
+    uow: ReservationsUnitOfWork,
+    clock: Clock,
+    admin_alerts: AdminAlerts,
 ) -> None:
     channel, decision = _channel(cmd.channel), _decision(cmd.decision)
     with uow:
         calendar = uow.calendars.get(cmd.property_id)
         calendar.decide(channel, cmd.uid, decision, today=clock.today_athens())
+        _alert_admin(calendar, uow, admin_alerts)  # the answer may reveal an overlap
         uow.commit()
 
 
@@ -158,7 +182,7 @@ def add_direct_reservation(
         uow.commit()
 
 
-def change_reservation(cmd: ChangeReservation, uow: ReservationsUnitOfWork) -> None:
+def change_reservation(cmd: ChangeReservation, uow: ReservationsUnitOfWork, clock: Clock) -> None:
     dates = StayDates(cmd.check_in_date, cmd.check_out_date)
     with uow:
         calendar = uow.calendars.get(cmd.property_id, expected_version=cmd.expected_version)
@@ -168,6 +192,7 @@ def change_reservation(cmd: ChangeReservation, uow: ReservationsUnitOfWork) -> N
             check_in_time=cmd.check_in_time,
             check_out_time=cmd.check_out_time,
             guest_name=cmd.guest_name,
+            today=clock.today_athens(),
         )
         uow.commit()
 
@@ -188,38 +213,32 @@ def end_stays(cmd: EndStays, uow: ReservationsUnitOfWork, clock: Clock) -> None:
         uow.commit()
 
 
-# --- events: alerts to the admin (DOMAIN §6) -----------------------------------------------------
+# --- alerts to the admin (DOMAIN §6) ------------------------------------------------------------
 
 
-def alert_feed_failing(
-    event: CalendarFeedFailing, uow: ReservationsUnitOfWork, admin_alerts: AdminAlerts
+def _alert_admin(
+    calendar: ReservationCalendar, uow: ReservationsUnitOfWork, admin_alerts: AdminAlerts
 ) -> None:
-    with uow:
-        details = uow.calendars.get(event.property_id).details
-        admin_alerts.feed_failing(
-            outbox=uow.outbox,
-            property_code=details.code,
-            property_name=details.name,
-            channel=_channel(event.channel),
-            since=event.since,
-        )
-        uow.commit()
-
-
-def alert_event_to_review(
-    event: CalendarEventNeedsReview, uow: ReservationsUnitOfWork, admin_alerts: AdminAlerts
-) -> None:
-    with uow:
-        details = uow.calendars.get(event.property_id).details
-        admin_alerts.event_to_review(
-            outbox=uow.outbox,
-            property_code=details.code,
-            property_name=details.name,
-            channel=_channel(event.channel),
-            dates=StayDates(event.check_in_date, event.check_out_date),
-            reason=event.reason,
-        )
-        uow.commit()
+    """Queue the alerts for what this unit raised, in this unit (ADR 0005)."""
+    details = calendar.details
+    for event in calendar.events:
+        if isinstance(event, CalendarFeedFailing):
+            admin_alerts.feed_failing(
+                outbox=uow.outbox,
+                property_code=details.code,
+                property_name=details.name,
+                channel=_channel(event.channel),
+                since=event.since,
+            )
+        elif isinstance(event, CalendarEventNeedsReview):
+            admin_alerts.event_to_review(
+                outbox=uow.outbox,
+                property_code=details.code,
+                property_name=details.name,
+                channel=_channel(event.channel),
+                dates=StayDates(event.check_in_date, event.check_out_date),
+                reason=event.reason,
+            )
 
 
 # --- helpers -------------------------------------------------------------------------------------
@@ -249,7 +268,5 @@ COMMAND_HANDLERS: dict[type[Command], Callable[..., None]] = {
     EndStays: end_stays,
 }
 
-EVENT_HANDLERS: dict[type[DomainEvent], list[Callable[..., None]]] = {
-    CalendarFeedFailing: [alert_feed_failing],
-    CalendarEventNeedsReview: [alert_event_to_review],
-}
+# The context's events are for the other contexts (DOMAIN §4.1); it reacts to none of its own.
+EVENT_HANDLERS: dict[type[DomainEvent], list[Callable[..., None]]] = {}

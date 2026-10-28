@@ -3,7 +3,8 @@
 Fixtures in tests/fixtures/ical/ follow each platform's format, with synthetic data.
 """
 
-import logging
+import time
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 
@@ -22,6 +23,12 @@ from kospm.reservations.service_layer.ports import FeedUnreadable
 
 FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "ical"
 URL = "https://www.airbnb.com/calendar/ical/1001.ics?s=SECRET-TOKEN"
+
+
+def vevent(*lines: str) -> bytes:
+    """A feed with one event made of `lines`."""
+    body = "\r\n".join(("BEGIN:VCALENDAR", "VERSION:2.0", "BEGIN:VEVENT", *lines, "END:VEVENT"))
+    return (body + "\r\nEND:VCALENDAR\r\n").encode()
 
 
 def parse(channel: Channel, name: str) -> list[tuple[EventKind, date, date, str]]:
@@ -58,13 +65,36 @@ class TestParser:
             (date(2026, 7, 20), date(2026, 7, 22)),  # 23:30 UTC is already the next day
         ]
 
-    def test_events_without_a_uid_or_valid_dates_are_skipped(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        with caplog.at_level(logging.WARNING):
-            events = parse(Channel.AIRBNB, "malformed.ics")
-        assert events == [(EventKind.RESERVATION, date(2026, 8, 1), date(2026, 8, 3), "")]
-        assert len(caplog.records) == 3
+    def test_an_event_that_cannot_be_read_makes_the_feed_unreadable(self) -> None:
+        # Skipped instead, its reservation would be cancelled (DOMAIN §6: a failed read changes
+        # nothing).
+        with pytest.raises(FeedUnreadable):
+            parse(Channel.AIRBNB, "malformed.ics")
+
+    @pytest.mark.parametrize(
+        "lines",
+        [
+            ("DTSTART;VALUE=DATE:20260712", "DTEND;VALUE=DATE:20260715"),  # no UID
+            ("UID:a", "DTSTART;VALUE=DATE:20260715", "DTEND;VALUE=DATE:20260712"),  # backwards
+            ("UID:a", "DTEND;VALUE=DATE:20260715"),  # no start
+            ("UID:a", "DTSTART:notadate", "DTEND;VALUE=DATE:20260715"),
+            ("UID:a", "DTSTART;VALUE=DATE:20260712", "DTSTART;VALUE=DATE:20260713"),
+            ("UID:a", "DTSTART;VALUE=PERIOD:20260712T000000Z/P3D"),
+            ("UID:" + "u" * 300, "DTSTART;VALUE=DATE:20260712", "DTEND;VALUE=DATE:20260715"),
+        ],
+    )
+    def test_what_makes_an_event_unreadable(self, lines: tuple[str, ...]) -> None:
+        with pytest.raises(FeedUnreadable):
+            ICalendarParser().parse(Channel.AIRBNB, vevent(*lines))
+
+    def test_an_event_may_give_its_length_instead_of_its_end(self) -> None:
+        (event,) = ICalendarParser().parse(
+            Channel.AIRBNB, vevent("UID:a", "DTSTART;VALUE=DATE:20260712", "DURATION:P3D")
+        )
+        assert (event.dates.check_in, event.dates.check_out) == (
+            date(2026, 7, 12),
+            date(2026, 7, 15),
+        )
 
     def test_an_empty_calendar_has_no_events(self) -> None:
         assert parse(Channel.AIRBNB, "empty.ics") == []
@@ -95,12 +125,15 @@ class TestClassifiers:
         assert classify_booking("CLOSED - Not available", "") == (EventKind.UNKNOWN, "")
 
 
-def fetcher(handler: object, *, max_bytes: int = 1000) -> HttpICalFetcher:
+def fetcher(
+    handler: object, *, max_bytes: int = 1000, monotonic: Callable[[], float] = time.monotonic
+) -> HttpICalFetcher:
     transport = httpx2.MockTransport(handler)  # type: ignore[arg-type]
     return HttpICalFetcher(
         timeout=5,
         max_bytes=max_bytes,
         client=httpx2.Client(transport=transport, follow_redirects=True),
+        monotonic=monotonic,
     )
 
 
@@ -154,14 +187,49 @@ class TestHttpFetcher:
         with pytest.raises(FeedUnreadable, match="https"):
             fetcher(lambda request: httpx2.Response(200)).fetch("http://example.com/a.ics")
 
-    def test_a_redirect_away_from_https_is_refused(self) -> None:
+    def test_a_redirect_to_http_is_never_sent(self) -> None:
+        sent: list[str] = []
+
         def api(request: httpx2.Request) -> httpx2.Response:
+            sent.append(request.url.scheme)
             if request.url.scheme == "https":
-                return httpx2.Response(302, headers={"Location": "http://example.com/a.ics"})
+                return httpx2.Response(302, headers={"Location": "http://example.com/a.ics?s=t"})
             return httpx2.Response(200, content=b"BEGIN:VCALENDAR")
 
         with pytest.raises(FeedUnreadable, match="redirected"):
             fetcher(api).fetch(URL)
+        assert sent == ["https"]  # the token never travelled in clear text
+
+    def test_a_validator_too_long_to_store_is_dropped(self) -> None:
+        def api(request: httpx2.Request) -> httpx2.Response:
+            return httpx2.Response(
+                200, content=b"BEGIN:VCALENDAR", headers={"ETag": '"' + "e" * 300 + '"'}
+            )
+
+        assert fetcher(api).fetch(URL).etag == ""  # no "not modified" check, but no failure
+
+    def test_a_server_sending_too_slowly_is_unreadable(self) -> None:
+        clock = iter(range(0, 1000, 100))  # every look at the clock: 100 s later
+
+        def api(request: httpx2.Request) -> httpx2.Response:
+            return httpx2.Response(200, content=b"BEGIN:VCALENDAR")
+
+        with pytest.raises(FeedUnreadable, match="slowly"):
+            fetcher(api, monotonic=lambda: float(next(clock))).fetch(URL)
+
+    def test_no_cookie_goes_from_one_feed_to_the_next(self) -> None:
+        cookies: list[str | None] = []
+
+        def api(request: httpx2.Request) -> httpx2.Response:
+            cookies.append(request.headers.get("Cookie"))
+            return httpx2.Response(
+                200, content=b"BEGIN:VCALENDAR", headers={"Set-Cookie": "session=abc; Path=/"}
+            )
+
+        reader = fetcher(api)
+        reader.fetch(URL)
+        reader.fetch(URL)
+        assert cookies == [None, None]
 
 
 class TestFileFetcher:

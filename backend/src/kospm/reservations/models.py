@@ -137,6 +137,11 @@ class WaitingCalendarEvent(models.Model):
         verbose_name = _("calendar event to review")
         verbose_name_plural = _("calendar events to review")
         ordering = ("check_in_date",)
+        constraints = (
+            models.UniqueConstraint(
+                fields=("calendar", "channel", "uid"), name="one_waiting_per_event"
+            ),
+        )
 
     def __str__(self) -> str:
         return f"{self.check_in_date} to {self.check_out_date} ({self.channel})"

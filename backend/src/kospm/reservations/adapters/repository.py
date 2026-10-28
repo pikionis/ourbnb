@@ -5,9 +5,14 @@ A ReservationCalendar is a `PropertyCalendar` row and its child rows. `calendar_
 any reservation, feed, waiting event or answer bumps the root's version (ADR 0016) and rewrites
 the children.
 
-When a feed was last read is not a change of the calendar: it is left out of the snapshot and
-written on its own, without the version, so a sync that finds nothing new never refuses the
-admin's open forms.
+A feed's sync bookkeeping (its ETag, Last-Modified and when it was last read) is no change of the
+calendar: it is left out of the snapshot and written on its own, without the version, and only to
+the feed that still has the URL that was read. So a sync that finds nothing new never refuses the
+admin's open forms, whatever validators the platform sends.
+
+Children are written in place by their natural keys (a feed by channel, a waiting event or an
+answer by channel and UID), so their rows keep their keys and the admin's actions keep naming
+them; of the reservations, only the changed ones are written.
 """
 
 from dataclasses import replace
@@ -104,7 +109,8 @@ def _reservation(row: models.Reservation) -> Reservation:
 
 def calendar_values(calendar: ReservationCalendar) -> dict[str, Any]:
     """The root row's columns, and a snapshot of the children that ignores their order (the
-    table returns them by date, the aggregate keeps them as it met them)."""
+    table returns them by date, the aggregate keeps them as it met them) and the feeds' sync
+    bookkeeping (written apart)."""
     details = calendar.details
     return {
         "code": details.code,
@@ -115,7 +121,10 @@ def calendar_values(calendar: ReservationCalendar) -> dict[str, Any]:
         _CHILDREN: (
             tuple(
                 sorted(
-                    (replace(feed, last_synced_at=None) for feed in calendar.feeds),
+                    (
+                        replace(feed, etag="", last_modified="", last_synced_at=None)
+                        for feed in calendar.feeds
+                    ),
                     key=lambda feed: feed.channel.value,
                 )
             ),
@@ -147,13 +156,21 @@ def _reservation_values(reservation: Reservation) -> tuple[Any, ...]:
     )
 
 
+def _bookkeeping(feed: Feed) -> tuple[str, str, str, datetime | None]:
+    """A feed's URL and sync bookkeeping."""
+    return (feed.url, feed.etag, feed.last_modified, feed.last_synced_at)
+
+
 class DjangoCalendarRepository(VersionedDjangoRepository[ReservationCalendar], CalendarRepository):
     model = models.PropertyCalendar
     id_field = "property_id"
 
     def __init__(self, *, using: str = DEFAULT_DB_ALIAS) -> None:
         super().__init__(using=using)
-        self._synced: dict[UUID, dict[str, datetime | None]] = {}
+        # What the tables hold for each calendar of this unit: its feeds' sync bookkeeping, and
+        # its reservations (only those that differ are written back).
+        self._stored_bookkeeping: dict[UUID, dict[str, tuple[str, str, str, datetime | None]]] = {}
+        self._stored_reservations: dict[UUID, dict[UUID, tuple[Any, ...]]] = {}
 
     def get(self, property_id: UUID, *, expected_version: int | None = None) -> ReservationCalendar:
         row = self._row(property_id)
@@ -171,27 +188,52 @@ class DjangoCalendarRepository(VersionedDjangoRepository[ReservationCalendar], C
         calendar = self._load(
             calendar_to_domain(row), row.version, expected_version=expected_version
         )
-        self._synced.setdefault(
-            row.property_id, {feed.channel: feed.last_synced_at for feed in row.feeds.all()}
-        )
+        if row.property_id not in self._stored_bookkeeping:  # the unit's first look at it
+            self._stored_bookkeeping[row.property_id] = {
+                feed.channel: (feed.url, feed.etag, feed.last_modified, feed.last_synced_at)
+                for feed in row.feeds.all()
+            }
+            self._stored_reservations[row.property_id] = {
+                reservation.id: _reservation_values(_reservation(reservation))
+                for reservation in row.reservations.all()
+            }
         return calendar
+
+    def _add(self, calendar: ReservationCalendar) -> None:
+        super()._add(calendar)
+        self._now_stored(calendar)
 
     def _persist(self, calendar: ReservationCalendar) -> None:
         super()._persist(calendar)
-        # When each feed was last read: no version, and only what changed.
-        synced = self._synced.get(calendar.id, {})
+        self._write_bookkeeping(calendar)
+        self._now_stored(calendar)
+
+    def _write_bookkeeping(self, calendar: ReservationCalendar) -> None:
+        """Each feed's ETag, Last-Modified and last read, without the version: written only to
+        the feed that still has the URL that was read, and only when they changed."""
+        stored = self._stored_bookkeeping.get(calendar.id, {})
         for feed in calendar.feeds:
-            if synced.get(feed.channel.value, feed.last_synced_at) != feed.last_synced_at:
-                models.CalendarFeed.objects.using(self.using).filter(
-                    calendar_id=calendar.id, channel=feed.channel.value
-                ).update(last_synced_at=feed.last_synced_at)
-        self._synced[calendar.id] = {
-            feed.channel.value: feed.last_synced_at for feed in calendar.feeds
+            if stored.get(feed.channel.value) == _bookkeeping(feed):
+                continue
+            models.CalendarFeed.objects.using(self.using).filter(
+                calendar_id=calendar.id, channel=feed.channel.value, url=feed.url
+            ).update(
+                etag=feed.etag, last_modified=feed.last_modified, last_synced_at=feed.last_synced_at
+            )
+
+    def _now_stored(self, calendar: ReservationCalendar) -> None:
+        self._stored_bookkeeping[calendar.id] = {
+            feed.channel.value: _bookkeeping(feed) for feed in calendar.feeds
+        }
+        self._stored_reservations[calendar.id] = {
+            reservation.id: _reservation_values(reservation)
+            for reservation in calendar.reservations
         }
 
     def forget(self) -> None:
         super().forget()
-        self._synced.clear()
+        self._stored_bookkeeping.clear()
+        self._stored_reservations.clear()
 
     def _row(self, property_id: UUID) -> models.PropertyCalendar | None:
         return (
@@ -208,57 +250,62 @@ class DjangoCalendarRepository(VersionedDjangoRepository[ReservationCalendar], C
         return {name: value for name, value in values.items() if name != _CHILDREN}
 
     def _write_children(self, calendar: ReservationCalendar) -> None:
-        """Rewrite the children: feeds, waiting events and answers are replaced; reservations
-        are updated in place (first, so a cancelled one frees its event for a new one) or
-        added. Reservations are never deleted."""
-        root = calendar.id
-        db = self.using
-        models.CalendarFeed.objects.using(db).filter(calendar_id=root).delete()
-        models.CalendarFeed.objects.using(db).bulk_create(
-            models.CalendarFeed(
-                calendar_id=root,
-                channel=feed.channel.value,
-                url=feed.url,
-                failing_since=feed.failing_since,
-                alerted=feed.alerted,
-                accept_empty=feed.accept_empty,
-                etag=feed.etag,
-                last_modified=feed.last_modified,
-                last_synced_at=feed.last_synced_at,
-            )
-            for feed in calendar.feeds
-        )
-        stored = set(
-            models.Reservation.objects.using(db)
-            .filter(calendar_id=root)
-            .values_list("id", flat=True)
-        )
-        rows = [self._reservation_row(root, reservation) for reservation in calendar.reservations]
+        """Write the children in place, by their natural keys. Reservations: the changed ones
+        are updated first (a cancelled one frees its event for a new one), then the new ones are
+        added; they are never deleted."""
+        db, root = self.using, calendar.id
+        stored = self._stored_reservations.get(root, {})
+        rows = {r.id: self._reservation_row(root, r) for r in calendar.reservations}
         models.Reservation.objects.using(db).bulk_update(
-            [row for row in rows if row.id in stored], fields=_RESERVATION_FIELDS
+            [
+                rows[r.id]
+                for r in calendar.reservations
+                if r.id in stored and stored[r.id] != _reservation_values(r)
+            ],
+            fields=_RESERVATION_FIELDS,
         )
         models.Reservation.objects.using(db).bulk_create(
-            [row for row in rows if row.id not in stored]
+            [rows[r.id] for r in calendar.reservations if r.id not in stored]
         )
-        models.WaitingCalendarEvent.objects.using(db).filter(calendar_id=root).delete()
-        models.WaitingCalendarEvent.objects.using(db).bulk_create(
-            models.WaitingCalendarEvent(
-                calendar_id=root,
-                channel=event.channel.value,
-                uid=event.uid,
-                check_in_date=event.dates.check_in,
-                check_out_date=event.dates.check_out,
-                reason=event.reason.value,
-                confirmation_code=event.confirmation_code,
-            )
-            for event in calendar.waiting
+        _write_by_key(
+            models.CalendarFeed.objects.using(db).filter(calendar_id=root),
+            ("channel",),
+            {
+                (feed.channel.value,): {
+                    "url": feed.url,
+                    "failing_since": feed.failing_since,
+                    "alerted": feed.alerted,
+                    "accept_empty": feed.accept_empty,
+                    "etag": feed.etag,
+                    "last_modified": feed.last_modified,
+                    "last_synced_at": feed.last_synced_at,
+                }
+                for feed in calendar.feeds
+            },
+            calendar_id=root,
         )
-        models.CalendarDecision.objects.using(db).filter(calendar_id=root).delete()
-        models.CalendarDecision.objects.using(db).bulk_create(
-            models.CalendarDecision(
-                calendar_id=root, channel=channel.value, uid=uid, decision=kind.value
-            )
-            for (channel, uid), kind in calendar.decisions.items()
+        _write_by_key(
+            models.WaitingCalendarEvent.objects.using(db).filter(calendar_id=root),
+            ("channel", "uid"),
+            {
+                (event.channel.value, event.uid): {
+                    "check_in_date": event.dates.check_in,
+                    "check_out_date": event.dates.check_out,
+                    "reason": event.reason.value,
+                    "confirmation_code": event.confirmation_code,
+                }
+                for event in calendar.waiting
+            },
+            calendar_id=root,
+        )
+        _write_by_key(
+            models.CalendarDecision.objects.using(db).filter(calendar_id=root),
+            ("channel", "uid"),
+            {
+                (channel.value, uid): {"decision": kind.value}
+                for (channel, uid), kind in calendar.decisions.items()
+            },
+            calendar_id=root,
         )
 
     @staticmethod
@@ -277,3 +324,26 @@ class DjangoCalendarRepository(VersionedDjangoRepository[ReservationCalendar], C
             guest_name=reservation.guest_name,
             stay_ended=reservation.stay_ended,
         )
+
+
+def _write_by_key(
+    rows: Any,
+    key: tuple[str, ...],
+    wanted: dict[tuple[Any, ...], dict[str, Any]],
+    **parent: Any,
+) -> None:
+    """Make the child rows of `rows` the `wanted` ones, by natural key: a row whose values differ
+    is updated in place, a missing one is added, one no longer wanted is deleted."""
+    stored = {tuple(getattr(row, name) for name in key): row for row in rows}
+    for natural_key, values in wanted.items():
+        row = stored.pop(natural_key, None)
+        if row is None:
+            rows.model.objects.using(rows.db).create(
+                **parent, **dict(zip(key, natural_key, strict=True)), **values
+            )
+        elif any(getattr(row, name) != value for name, value in values.items()):
+            rows.model.objects.using(rows.db).filter(pk=row.pk).update(**values)
+    if stored:
+        rows.model.objects.using(rows.db).filter(
+            pk__in=[row.pk for row in stored.values()]
+        ).delete()

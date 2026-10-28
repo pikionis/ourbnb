@@ -12,7 +12,7 @@ from typing import Any
 from uuid import UUID
 
 import pytest
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.test import Client
 from django.urls import reverse
 
@@ -23,6 +23,7 @@ from kospm.reservations.domain.commands import AddDirectReservation, UpdatePrope
 from kospm.shared.clock import SystemClock
 from kospm.shared.domain import new_id
 from kospm.shared.outbox.models import OutboxMessage
+from kospm.shared.unit_of_work import ConcurrencyError
 from tests.e2e.owners import add_property_in_admin, register_owner_in_admin
 
 pytestmark = pytest.mark.django_db
@@ -36,9 +37,9 @@ def day(offset: int) -> date:
     return SystemClock().today_athens() + timedelta(days=offset)
 
 
-def ics(*events: tuple[str, int, int, str]) -> bytes:
+def ics(*events: tuple[str, int, int, str], prodid: str = "-//test//EN") -> bytes:
     """A feed with events (uid, check-in offset, check-out offset, summary), CRLF as sent."""
-    lines = ["BEGIN:VCALENDAR", "PRODID:-//test//EN", "VERSION:2.0"]
+    lines = ["BEGIN:VCALENDAR", f"PRODID:{prodid}", "VERSION:2.0"]
     for uid, start, end, summary in events:
         lines += [
             "BEGIN:VEVENT",
@@ -58,8 +59,8 @@ class Feeds:
     def __init__(self, folder: Path) -> None:
         self.files = {AIRBNB_URL: folder / "airbnb.ics", BOOKING_URL: folder / "booking.ics"}
 
-    def airbnb(self, *events: tuple[str, int, int, str]) -> None:
-        self.files[AIRBNB_URL].write_bytes(ics(*events))
+    def airbnb(self, *events: tuple[str, int, int, str], prodid: str = "-//test//EN") -> None:
+        self.files[AIRBNB_URL].write_bytes(ics(*events, prodid=prodid))
 
     def booking(self, *events: tuple[str, int, int, str]) -> None:
         self.files[BOOKING_URL].write_bytes(ics(*events))
@@ -126,6 +127,8 @@ class TestSync:
         assert "2 feeds read" in sync()
         assert confirmed() == {"a": (day(2), day(5)), "b": (day(10), day(12))}
         before = version(property_id)
+        # The same events in a file that differs: read and parsed again, not "not modified".
+        feeds.airbnb(("a", 2, 5, RESERVED), ("b", 10, 12, RESERVED), prodid="-//other//EN")
 
         sync()
 
@@ -229,6 +232,38 @@ class TestSync:
 
         assert len(alerts("admin_calendar_feed_failing")) == 2
 
+    def test_an_event_that_cannot_be_read_cancels_nothing(
+        self, feeds: Feeds, property_id: UUID
+    ) -> None:
+        feeds.airbnb(("a", 2, 5, RESERVED), ("b", 10, 12, RESERVED))
+        sync()
+        content = feeds.files[AIRBNB_URL].read_bytes()
+        broken = content.replace(f"DTEND;VALUE=DATE:{day(5):%Y%m%d}".encode(), b"DTEND:notadate")
+        feeds.files[AIRBNB_URL].write_bytes(broken)
+
+        sync()
+
+        assert set(confirmed()) == {"a", "b"}
+        assert models.CalendarFeed.objects.get(channel="airbnb").failing_since is not None
+
+    def test_an_unexpected_error_fails_the_command_after_the_other_feeds(
+        self, feeds: Feeds, property_id: UUID, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class Broken(FileICalFetcher):
+            def fetch(self, url: str, *, etag: str = "", last_modified: str = "") -> Any:
+                if url == AIRBNB_URL:
+                    raise RuntimeError("a bug")
+                return super().fetch(url, etag=etag, last_modified=last_modified)
+
+        monkeypatch.setattr(bootstrap, "ical_fetcher", lambda: Broken(feeds.files))
+        monkeypatch.setattr(bootstrap._thread_local, "bus", None, raising=False)
+        feeds.booking(("b", 10, 12, CLOSED))
+
+        with pytest.raises(CommandError):
+            sync()
+
+        assert models.WaitingCalendarEvent.objects.get().uid == "b"  # Booking was still read
+
     def test_an_inactive_property_is_not_read(self, feeds: Feeds, property_id: UUID) -> None:
         models.PropertyCalendar.objects.filter(pk=property_id).update(active=False)
         feeds.airbnb(("a", 2, 5, RESERVED))
@@ -251,6 +286,29 @@ class TestStaysEnd:
         assert models.Reservation.objects.get().stay_ended
         assert "emit_stay_ended: 1 properties" in out.getvalue()
         assert "emit_stay_ended: 0 properties" in out.getvalue()
+
+    def test_one_property_failing_never_stops_the_others(
+        self, feeds: Feeds, property_id: UUID, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from kospm.reservations.entrypoints import emit_stay_ended
+
+        handled: list[Any] = []
+
+        class Bus:
+            def handle(self, command: Any) -> None:
+                handled.append(command.property_id)
+                if len(handled) == 1:
+                    raise ConcurrencyError("a sync saved the calendar meanwhile")
+
+        monkeypatch.setattr(
+            emit_stay_ended, "calendars_with_stays_ending", lambda today: [new_id(), new_id()]
+        )
+        monkeypatch.setattr(emit_stay_ended, "get_bus", Bus)
+
+        with pytest.raises(CommandError):
+            call_command("emit_stay_ended", stdout=io.StringIO())
+
+        assert len(handled) == 2
 
 
 class TestAdmin:
@@ -317,6 +375,44 @@ class TestAdmin:
         assert added.status_code == 302, added.content.decode()[:2000]
         direct = models.Reservation.objects.get(channel="direct")
         assert (direct.check_in_time, direct.guest_name) == (time(15), "Γιάννης")
+
+    def test_a_cancelled_airbnb_reservation_opens(
+        self, admin_client: Client, feeds: Feeds, property_id: UUID
+    ) -> None:
+        feeds.airbnb(("a", 2, 5, RESERVED), ("b", 10, 12, RESERVED))
+        sync()
+        feeds.airbnb(("b", 10, 12, RESERVED))
+        sync()
+        cancelled = models.Reservation.objects.get(external_uid="a")
+        page = reverse("admin:reservations_reservation_change", args=[cancelled.pk])
+        assert admin_client.get(page).status_code == 200
+
+    def test_a_form_shown_before_a_change_is_refused(
+        self, admin_client: Client, feeds: Feeds, property_id: UUID
+    ) -> None:
+        feeds.airbnb(("a", 2, 5, RESERVED))
+        sync()
+        reservation = models.Reservation.objects.get()
+        shown = version(property_id)
+        feeds.airbnb(("a", 2, 5, RESERVED), ("b", 10, 12, RESERVED))
+        sync()  # a new booking arrives while the admin's form is open
+
+        response = admin_client.post(
+            reverse("admin:reservations_reservation_change", args=[reservation.pk]),
+            {
+                "check_in_date": str(day(2)),
+                "check_out_date": str(day(5)),
+                "check_in_time": "13:00",
+                "check_out_time": "11:00",
+                "guest_name": "Anna",
+                "version": str(shown),
+            },
+            follow=True,
+        )
+
+        assert "Κάποιος άλλος" in response.content.decode()
+        reservation.refresh_from_db()
+        assert reservation.check_in_time == time(15)
 
     def test_the_admin_changes_an_airbnb_reservations_times_not_its_dates(
         self, admin_client: Client, feeds: Feeds, property_id: UUID

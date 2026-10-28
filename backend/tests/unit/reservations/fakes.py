@@ -1,6 +1,6 @@
 """In-memory fakes of the reservations ports (Cosmic Python ch. 3: fakes, not mocks)."""
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from uuid import UUID
 
 from kospm.reservations.domain.calendar import ReservationCalendar
@@ -60,9 +60,12 @@ class FakeICalFetcher(ICalFetcher):
     def __init__(self) -> None:
         self.answers: dict[str, FetchedFeed | FeedUnreadable] = {}
         self.requests: list[tuple[str, str, str]] = []
+        self.while_fetching: Callable[[], None] | None = None  # what happens meanwhile
 
     def fetch(self, url: str, *, etag: str = "", last_modified: str = "") -> FetchedFeed:
         self.requests.append((url, etag, last_modified))
+        if self.while_fetching is not None:
+            self.while_fetching()
         answer = self.answers[url]
         if isinstance(answer, FeedUnreadable):
             raise answer

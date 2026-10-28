@@ -74,6 +74,7 @@ superuser:
 
 ## Scheduled jobs, run once (iCal sync, plan tomorrow, process outbox)
 run-jobs:
+	$(MANAGE) announce_calendar_settings
 	$(MANAGE) sync_calendars
 	$(MANAGE) emit_stay_ended
 	$(MANAGE) process_outbox
