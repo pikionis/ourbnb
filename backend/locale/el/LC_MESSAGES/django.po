@@ -6,6 +6,233 @@ msgstr ""
 "Language: el\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+# --- properties: the owner's property pages (Phase 2b, step 4) ---------------------------------
+
+msgid "A code is saved."
+msgstr "Υπάρχει αποθηκευμένος κωδικός."
+
+msgid "A photo is saved."
+msgstr "Υπάρχει αποθηκευμένη φωτογραφία."
+
+msgid "Add"
+msgstr "Προσθήκη"
+
+msgid "Add a property"
+msgstr "Προσθήκη ακινήτου"
+
+msgid "Address"
+msgstr "Διεύθυνση"
+
+msgid "Air conditioning"
+msgstr "Κλιματισμός"
+
+msgid "AMA"
+msgstr "ΑΜΑ"
+
+msgid "Baby cot"
+msgstr "Βρεφική κούνια"
+
+msgid "Balcony or terrace"
+msgstr "Μπαλκόνι ή βεράντα"
+
+msgid "commission rate of the contract to sign"
+msgstr "προμήθεια του συμβολαίου προς υπογραφή"
+
+msgid "Complete"
+msgstr "Πλήρες"
+
+msgid "Contract"
+msgstr "Συμβόλαιο"
+
+msgid "contract to sign"
+msgstr "συμβόλαιο προς υπογραφή"
+
+msgid "Contract to sign"
+msgstr "Συμβόλαιο προς υπογραφή"
+
+msgid "Coordinates"
+msgstr "Συντεταγμένες"
+
+msgid "Directions in English"
+msgstr "Οδηγίες στα αγγλικά"
+
+msgid "Directions in Greek"
+msgstr "Οδηγίες στα ελληνικά"
+
+msgid "Dishwasher"
+msgstr "Πλυντήριο πιάτων"
+
+msgid "Download it"
+msgstr "Λήψη"
+
+msgid "Download it, sign it and upload it"
+msgstr "Κατεβάστε το, υπογράψτε το και ανεβάστε το"
+
+msgid "Download the contract (PDF)"
+msgstr "Λήψη του συμβολαίου (PDF)"
+
+msgid "Enter its number"
+msgstr "Γράψτε τον αριθμό της"
+
+msgid "Free parking"
+msgstr "Δωρεάν στάθμευση"
+
+msgid "Give it a name you will recognise, e.g. Villa Elena. We give it a code that guests will use."
+msgstr "Δώστε του ένα όνομα που θα αναγνωρίζετε, π.χ. Villa Elena. Εμείς του δίνουμε έναν κωδικό που θα χρησιμοποιούν οι επισκέπτες."
+
+msgid "Hair dryer"
+msgstr "Πιστολάκι μαλλιών"
+
+msgid "Heating"
+msgstr "Θέρμανση"
+
+msgid "How guests find the house from the main road, and where the key box is."
+msgstr "Πώς βρίσκουν οι επισκέπτες το σπίτι από τον κεντρικό δρόμο και πού είναι το κουτί κλειδιών."
+
+msgid "How guests get in"
+msgstr "Πώς μπαίνουν οι επισκέπτες"
+
+msgid "In Google Maps, press and hold on the house and copy the two numbers, e.g. 36.89301, 27.28770."
+msgstr "Στο Google Maps πατήστε παρατεταμένα πάνω στο σπίτι και αντιγράψτε τους δύο αριθμούς, π.χ. 36.89301, 27.28770."
+
+msgid "Iron"
+msgstr "Σίδερο"
+
+msgid "It is not shown again after saving. Leave it empty to keep the saved one."
+msgstr "Δεν εμφανίζεται ξανά μετά την αποθήκευση. Αφήστε το κενό για να κρατήσετε τον αποθηκευμένο."
+
+msgid "Key box code for cleaners, if different (optional)"
+msgstr "Κωδικός κουτιού κλειδιών για τις καθαρίστριες, αν είναι διαφορετικός (προαιρετικό)"
+
+msgid "Key box code for guests"
+msgstr "Κωδικός κουτιού κλειδιών για τους επισκέπτες"
+
+msgid "Kitchen"
+msgstr "Κουζίνα"
+
+msgid "Map link for guests (optional)"
+msgstr "Σύνδεσμος χάρτη για τους επισκέπτες (προαιρετικό)"
+
+msgid "Missing: %(items)s"
+msgstr "Λείπουν: %(items)s"
+
+msgid "Name of the property"
+msgstr "Όνομα του ακινήτου"
+
+msgid "No"
+msgstr "Όχι"
+
+msgid "Number of the sublease declaration"
+msgstr "Αριθμός της δήλωσης υπεκμίσθωσης"
+
+msgid "Open it"
+msgstr "Άνοιγμα"
+
+msgid "Other amenities the house does not have (one per line)"
+msgstr "Άλλες παροχές που δεν έχει το σπίτι (μία ανά γραμμή)"
+
+msgid "Other amenities the house has (one per line)"
+msgstr "Άλλες παροχές που έχει το σπίτι (μία ανά γραμμή)"
+
+msgid "owner cleaning charge of the contract to sign (€)"
+msgstr "χρέωση καθαρισμού του συμβολαίου προς υπογραφή (€)"
+
+msgid "Photo of the key box"
+msgstr "Φωτογραφία του κουτιού κλειδιών"
+
+msgid "Photo of the outside"
+msgstr "Φωτογραφία του εξωτερικού χώρου"
+
+msgid "Pool"
+msgstr "Πισίνα"
+
+msgid "Profile and check-in guide"
+msgstr "Προφίλ και οδηγίες check-in"
+
+msgid "Sea view"
+msgstr "Θέα θάλασσα"
+
+msgid "Sign it digitally, e.g. on gov.gr, with your own credentials. We never ask for your passwords."
+msgstr "Υπογράψτε το ψηφιακά, π.χ. στο gov.gr, με τους δικούς σας κωδικούς. Εμείς δεν ζητάμε ποτέ τους κωδικούς σας."
+
+msgid "Signed"
+msgstr "Υπογράφηκε"
+
+msgid "Sublease declaration"
+msgstr "Δήλωση υπεκμίσθωσης"
+
+msgid "Thank you! The signed contract is uploaded."
+msgstr "Ευχαριστούμε! Το υπογεγραμμένο συμβόλαιο ανέβηκε."
+
+msgid "The file is larger than %(mb)s MB."
+msgstr "Το αρχείο είναι μεγαλύτερο από %(mb)s MB."
+
+msgid "The guests' assistant answers from this list. Leave unknown items empty."
+msgstr "Ο βοηθός των επισκεπτών απαντά από αυτή τη λίστα. Αφήστε κενό ό,τι δεν ξέρετε."
+
+msgid "The number of the sublease declaration is saved."
+msgstr "Ο αριθμός της δήλωσης υπεκμίσθωσης αποθηκεύτηκε."
+
+msgid "The number of the sublease declaration that you or your accountant filed with AADE."
+msgstr "Ο αριθμός της δήλωσης υπεκμίσθωσης που υπέβαλατε εσείς ή ο λογιστής σας στην ΑΑΔΕ."
+
+msgid "The PDF the owner downloads in the portal, signs and uploads signed. Terms left empty take the defaults."
+msgstr "Το PDF που ο ιδιοκτήτης κατεβάζει στην πύλη, υπογράφει και ανεβάζει υπογεγραμμένο. Όροι που μένουν κενοί παίρνουν τις προεπιλογές."
+
+msgid "The profile is saved."
+msgstr "Το προφίλ αποθηκεύτηκε."
+
+msgid "The signed contract (PDF)"
+msgstr "Το υπογεγραμμένο συμβόλαιο (PDF)"
+
+msgid "The signed contract is uploaded."
+msgstr "Το υπογεγραμμένο συμβόλαιο έχει ανέβει."
+
+msgid "TV"
+msgstr "Τηλεόραση"
+
+msgid "Upload"
+msgstr "Ανέβασμα"
+
+msgid "Upload the contract to sign as a PDF."
+msgstr "Ανεβάστε το συμβόλαιο προς υπογραφή σε PDF."
+
+msgid "Upload the signed PDF here."
+msgstr "Ανεβάστε εδώ το υπογεγραμμένο PDF."
+
+msgid "Washing machine"
+msgstr "Πλυντήριο ρούχων"
+
+msgid "We are preparing it"
+msgstr "Το ετοιμάζουμε"
+
+msgid "We are preparing your contract. You will find it here."
+msgstr "Ετοιμάζουμε το συμβόλαιό σας. Θα το βρείτε εδώ."
+
+msgid "We register it after your sublease declaration"
+msgstr "Το καταχωρίζουμε εμείς μετά τη δήλωση υπεκμίσθωσής σας"
+
+msgid "What it needs to start"
+msgstr "Τι χρειάζεται για να ξεκινήσει"
+
+msgid "When everything is ready, we activate the property ourselves."
+msgstr "Όταν όλα είναι έτοιμα, ενεργοποιούμε εμείς το ακίνητο."
+
+msgid "Where it is"
+msgstr "Πού βρίσκεται"
+
+msgid "Wi-Fi"
+msgstr "Wi-Fi"
+
+msgid "Write the two numbers as Google Maps shows them, e.g. 36.89301, 27.28770."
+msgstr "Γράψτε τους δύο αριθμούς όπως τους δείχνει το Google Maps, π.χ. 36.89301, 27.28770."
+
+msgid "Yes"
+msgstr "Ναι"
+
+msgid "Your property is added. Now complete its checklist."
+msgstr "Το ακίνητό σας προστέθηκε. Τώρα συμπληρώστε τη λίστα του."
+
 msgid "%(code)s: active."
 msgstr "%(code)s: ενεργό."
 

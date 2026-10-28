@@ -15,10 +15,11 @@ from uuid import UUID
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest
+from django.http.response import HttpResponseBase
 from django.shortcuts import resolve_url
 
-type View = Callable[..., HttpResponse]
+type View = Callable[..., HttpResponseBase]
 
 
 def owner_page(view: View) -> View:
@@ -26,7 +27,7 @@ def owner_page(view: View) -> View:
     staff login is refused (403)."""
 
     @functools.wraps(view)
-    def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+    def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
         owner_id = current_owner_id(request)
         if owner_id is None:
             raise PermissionDenied("the owner portal is for owners' logins")

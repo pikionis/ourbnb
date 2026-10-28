@@ -156,9 +156,9 @@ Owners register and complete the checklist themselves (DOMAIN §5). Design brief
 - [x] Portal shell (layout, language toggle, owner-scoped access) and the checklist dashboard.
 - [x] Owner details (step 1) and bank account: holder name, `PENDING → TRANSFER_SENT → VERIFIED`
       with the payee check recorded by the admin; IBAN locked in the portal once verified.
-- [ ] Properties: add (code assigned automatically), profile form with photo uploads, files served
+- [x] Properties: add (code assigned automatically), profile form with photo uploads, files served
       only to their owner; owner edits only while `ONBOARDING`.
-- [ ] Contract: the admin uploads the contract to sign (`ContractDraft`); the owner downloads it and
+- [x] Contract: the admin uploads the contract to sign (`ContractDraft`); the owner downloads it and
       uploads the signed PDF (signature done by the owner, e.g. on gov.gr — never with their
       credentials on our side). Sublease declaration number.
 - [ ] Paste listing text → AI extracts profile fields (`ListingTextExtractor` port, Claude adapter)

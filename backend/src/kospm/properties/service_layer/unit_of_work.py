@@ -45,6 +45,10 @@ class PropertyRepository(TrackingRepository[Property]):
     def list_by_owner(self, owner_id: UUID) -> list[Property]:
         """All properties of one owner."""
 
+    @abc.abstractmethod
+    def codes_with_prefix(self, prefix: str) -> list[PropertyCode]:
+        """The codes in use that start with `prefix` and a hyphen (read only, not tracked)."""
+
 
 class PropertiesUnitOfWork(AbstractUnitOfWork):
     """One unit of work over the owners and properties of this context."""

@@ -1,0 +1,31 @@
+{% extends "portal/base.html" %}
+{% load i18n %}
+{% block title %}{{ prop.name }}{% endblock %}
+{% block content %}
+  <p><a href="{% url 'portal:dashboard' %}">‹ {% translate "Your properties" %}</a></p>
+  <h1>{{ prop.name }}</h1>
+  <p class="state-text">{{ prop.code.value }} · {{ status }}</p>
+  {% if not editable %}
+    <p class="alert alert-info">{% translate "This property is no longer being set up: to change it, contact us." %}</p>
+  {% endif %}
+
+  <h2>{% translate "What it needs to start" %}</h2>
+  <ol class="checklist">
+    {% for row in rows %}
+      <li>
+        {% if row.url %}<a class="checklist-row" href="{{ row.url }}">{% else %}<div class="checklist-row">{% endif %}
+          {% if row.done %}
+            <span class="state state-done" aria-hidden="true">✓</span>
+          {% elif row.url %}
+            <span class="state state-missing" aria-hidden="true">!</span>
+          {% else %}
+            <span class="state state-waiting" aria-hidden="true">…</span>
+          {% endif %}
+          <span class="checklist-text"><strong>{{ row.title }}</strong><span class="state-text">{{ row.text }}</span></span>
+          {% if row.url %}<span class="chevron" aria-hidden="true">›</span>{% endif %}
+        {% if row.url %}</a>{% else %}</div>{% endif %}
+      </li>
+    {% endfor %}
+  </ol>
+  <p class="fine-print">{% translate "When everything is ready, we activate the property ourselves." %}</p>
+{% endblock %}

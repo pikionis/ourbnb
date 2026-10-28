@@ -1,0 +1,55 @@
+{% extends "portal/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Profile and check-in guide" %}{% endblock %}
+{% block content %}
+  {% include "portal/_property_header.html" %}
+  <h1>{% translate "Profile and check-in guide" %}</h1>
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% if form.errors %}
+      <div class="alert alert-error error-summary" role="alert">
+        <p><strong>{% translate "Please check the following:" %}</strong></p>
+        <ul>
+          {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+          {% for field in form.visible_fields %}{% for error in field.errors %}<li><a href="#{{ field.auto_id }}">{{ field.label }}: {{ error }}</a></li>{% endfor %}{% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+    {{ form.version }}
+
+    <h2>{% translate "Where it is" %}</h2>
+    {% include "portal/_field.html" with field=form.address %}
+    {% include "portal/_field.html" with field=form.coordinates %}
+    {% include "portal/_field.html" with field=form.map_url %}
+
+    <h2>{% translate "How guests get in" %}</h2>
+    {% include "portal/_field.html" with field=form.directions_el %}
+    {% include "portal/_field.html" with field=form.directions_en %}
+    {% include "portal/_field.html" with field=form.exterior_photo %}
+    {% if prop.check_in_guide.exterior_photo %}
+      <p class="fine-print">✓ {% translate "A photo is saved." %} <a href="{% url 'portal:property_file' prop.code.value 'exterior_photo' %}">{% translate "Open it" %}</a></p>
+    {% endif %}
+    {% include "portal/_field.html" with field=form.lockbox_photo %}
+    {% if prop.check_in_guide.lockbox_photo %}
+      <p class="fine-print">✓ {% translate "A photo is saved." %} <a href="{% url 'portal:property_file' prop.code.value 'lockbox_photo' %}">{% translate "Open it" %}</a></p>
+    {% endif %}
+    {% include "portal/_field.html" with field=form.guest_lockbox_code %}
+    {% if prop.check_in_guide.guest_lockbox_code %}<p class="fine-print">✓ {% translate "A code is saved." %}</p>{% endif %}
+    {% include "portal/_field.html" with field=form.cleaner_lockbox_code %}
+
+    <h2>{% translate "Amenities" %}</h2>
+    <p class="help">{% translate "The guests' assistant answers from this list. Leave unknown items empty." %}</p>
+    <div class="amenities">
+      {% for field in form.amenity_fields %}
+        <fieldset class="amenity">
+          <legend>{{ field.label }}</legend>
+          {% for choice in field %}<label class="choice">{{ choice.tag }} {{ choice.choice_label }}</label>{% endfor %}
+        </fieldset>
+      {% endfor %}
+    </div>
+    {% include "portal/_field.html" with field=form.other_included %}
+    {% include "portal/_field.html" with field=form.other_not_included %}
+
+    {% if editable %}<button type="submit" class="button">{% translate "Save" %}</button>{% endif %}
+  </form>
+{% endblock %}

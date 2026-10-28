@@ -77,6 +77,10 @@ class BankVerificationNotStarted(DomainError):
     """A code was entered, but no test transfer is waiting for one."""
 
 
+class NoContractToSign(DomainError):
+    """The owner uploaded a signed contract, but the IKE has not offered one to sign yet."""
+
+
 class TransferNotSentYet(DomainError):
     """A code was entered before the IKE recorded the test transfer as sent (ADR 0018)."""
 

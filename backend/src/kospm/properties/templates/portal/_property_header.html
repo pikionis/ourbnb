@@ -1,0 +1,4 @@
+{% load i18n %}<p><a href="{% url 'portal:property' prop.code.value %}">‹ {{ prop.name }}</a></p>
+{% if not editable %}
+  <p class="alert alert-info">{% translate "This property is no longer being set up: to change it, contact us." %}</p>
+{% endif %}

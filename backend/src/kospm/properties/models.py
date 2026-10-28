@@ -106,6 +106,23 @@ class Property(models.Model):
     amenities_not_included = models.JSONField(_("amenities not included"), default=list, blank=True)
     ical_feeds = models.JSONField(_("calendar feeds"), default=list, blank=True)
 
+    contract_draft_document = models.FileField(
+        _("contract to sign"), upload_to="contracts/drafts/", blank=True
+    )
+    contract_draft_commission_rate = models.DecimalField(
+        _("commission rate of the contract to sign"),
+        max_digits=5,
+        decimal_places=4,
+        null=True,
+        blank=True,
+    )
+    contract_draft_owner_cleaning_charge = models.DecimalField(
+        _("owner cleaning charge of the contract to sign (€)"),
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     contract_commission_rate = models.DecimalField(
         _("commission rate"), max_digits=5, decimal_places=4, null=True, blank=True
     )

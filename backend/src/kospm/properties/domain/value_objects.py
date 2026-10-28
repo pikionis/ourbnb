@@ -262,41 +262,57 @@ class Contract:
     document: str
 
     def __post_init__(self) -> None:
-        if not isinstance(self.commission_rate, Decimal):
-            raise TypeError(
-                f"commission_rate must be a Decimal, got {type(self.commission_rate).__name__}"
-            )
-        if not Decimal(0) <= self.commission_rate < Decimal(1):
-            raise InvalidValue(
-                f"the commission rate {self.commission_rate} is not in 0..1",
-                field="commission_rate",
-            )
-        if self.commission_rate != self.commission_rate.quantize(_RATE_STEP):
-            raise InvalidValue(
-                f"the commission rate {self.commission_rate} has more than 4 decimal places",
-                field="commission_rate",
-            )
-        if not isinstance(self.owner_cleaning_charge, Money):
-            raise TypeError("owner_cleaning_charge must be Money")
-        if self.owner_cleaning_charge < Money.zero() or not self.owner_cleaning_charge.is_rounded:
-            raise InvalidValue(
-                f"the cleaning charge {self.owner_cleaning_charge} must be a non-negative "
-                "amount in whole cents",
-                field="owner_cleaning_charge",
-            )
+        _check_terms(self.commission_rate, self.owner_cleaning_charge)
         try:
             require_aware(self.signed_at)
         except ValueError as error:
             raise InvalidValue(
                 "the signing time must be timezone-aware", field="signed_at"
             ) from error
-        document = self.document.strip()
-        if not document.lower().endswith(_CONTRACT_SUFFIX):
-            raise InvalidValue(
-                f"a signed contract needs its signed PDF, not {document!r}",
-                field="contract_document",
-            )
-        _set(self, "document", document)
+        _set(self, "document", _pdf(self.document, field="contract_document"))
+
+
+@dataclass(frozen=True)
+class ContractDraft:
+    """The contract the IKE offers for a property: its PDF and its terms (DOMAIN §5). The owner
+    signs it themself and uploads the signed PDF; the contract then has these terms."""
+
+    document: str
+    commission_rate: Decimal
+    owner_cleaning_charge: Money
+
+    def __post_init__(self) -> None:
+        _check_terms(self.commission_rate, self.owner_cleaning_charge)
+        _set(self, "document", _pdf(self.document, field="contract_draft"))
+
+
+def _check_terms(commission_rate: Decimal, owner_cleaning_charge: Money) -> None:
+    if not isinstance(commission_rate, Decimal):
+        raise TypeError(f"commission_rate must be a Decimal, got {type(commission_rate).__name__}")
+    if not Decimal(0) <= commission_rate < Decimal(1):
+        raise InvalidValue(
+            f"the commission rate {commission_rate} is not in 0..1", field="commission_rate"
+        )
+    if commission_rate != commission_rate.quantize(_RATE_STEP):
+        raise InvalidValue(
+            f"the commission rate {commission_rate} has more than 4 decimal places",
+            field="commission_rate",
+        )
+    if not isinstance(owner_cleaning_charge, Money):
+        raise TypeError("owner_cleaning_charge must be Money")
+    if owner_cleaning_charge < Money.zero() or not owner_cleaning_charge.is_rounded:
+        raise InvalidValue(
+            f"the cleaning charge {owner_cleaning_charge} must be a non-negative amount in "
+            "whole cents",
+            field="owner_cleaning_charge",
+        )
+
+
+def _pdf(document: str, *, field: str) -> str:
+    document = document.strip()
+    if not document.lower().endswith(_CONTRACT_SUFFIX):
+        raise InvalidValue(f"a contract is a PDF, not {document!r}", field=field)
+    return document
 
 
 def _is_photo(path: str) -> bool:

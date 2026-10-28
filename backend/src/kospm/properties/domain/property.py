@@ -10,7 +10,7 @@ is verified as an argument; the handler reads it. Only this aggregate changes in
 """
 
 from collections.abc import Iterable
-from datetime import time
+from datetime import datetime, time
 from enum import StrEnum
 from typing import Self
 from uuid import UUID
@@ -18,13 +18,17 @@ from uuid import UUID
 from kospm.properties.domain.checklist import ActivationRequirement, ProfileItem
 from kospm.properties.domain.defaults import PropertyDefaults
 from kospm.properties.domain.errors import (
+    ChangeThroughTheIke,
     InvalidStatusTransition,
     InvalidValue,
+    NoContractToSign,
     ProfileMustStayComplete,
+    PropertyNotFound,
     PropertyNotReadyForActivation,
 )
 from kospm.properties.domain.events import (
     AmaAssigned,
+    ContractOffered,
     ContractSigned,
     PropertyActivated,
     PropertyDeactivated,
@@ -37,6 +41,7 @@ from kospm.properties.domain.value_objects import (
     Amenities,
     CheckInGuide,
     Contract,
+    ContractDraft,
     GeoPoint,
     IcalFeed,
     PropertyCode,
@@ -71,6 +76,7 @@ class Property(Aggregate[UUID]):
         check_in_guide: CheckInGuide | None = None,
         amenities: Amenities | None = None,
         ical_feeds: tuple[IcalFeed, ...] = (),
+        contract_draft: ContractDraft | None = None,
         contract: Contract | None = None,
         sublease_declaration_number: str = "",
         ama_number: str = "",
@@ -89,6 +95,7 @@ class Property(Aggregate[UUID]):
         self.check_in_guide = check_in_guide or CheckInGuide()
         self.amenities = amenities or Amenities()
         self.ical_feeds = ical_feeds
+        self.contract_draft = contract_draft
         self.contract = contract
         self.sublease_declaration_number = sublease_declaration_number
         self.ama_number = ama_number
@@ -164,6 +171,27 @@ class Property(Aggregate[UUID]):
 
     # --- legal steps ---------------------------------------------------------------------------
 
+    def offer_contract(self, draft: ContractDraft) -> None:
+        """Onboarding step 3, first half: the IKE uploads the contract to sign, with its terms.
+        A new draft replaces the previous one; it does not undo a signed contract."""
+        self._refuse_if_offboarded("offer a contract for")
+        if draft != self.contract_draft:
+            self.contract_draft = draft
+            self.events.append(ContractOffered(property_id=self.id))
+
+    def sign_offered_contract(self, document: str, *, signed_at: datetime) -> None:
+        """The owner uploads the draft, signed by them: the contract has the draft's terms."""
+        if self.contract_draft is None:
+            raise NoContractToSign("the IKE has not offered a contract for this property yet")
+        self.sign_contract(
+            Contract(
+                commission_rate=self.contract_draft.commission_rate,
+                owner_cleaning_charge=self.contract_draft.owner_cleaning_charge,
+                signed_at=signed_at,
+                document=document,
+            )
+        )
+
     def sign_contract(self, contract: Contract) -> None:
         """Onboarding step 3: the signed contract (its PDF) is recorded."""
         self._refuse_if_offboarded("sign a contract for")
@@ -235,6 +263,17 @@ class Property(Aggregate[UUID]):
         self._refuse_if_offboarded("offboard")
         self.status = PropertyStatus.OFFBOARDED
         self.events.append(PropertyOffboarded(property_id=self.id))
+
+    # --- the owner portal ----------------------------------------------------------------------
+
+    def check_owner_may_change(self, owner_id: UUID) -> None:
+        """An owner changes only their own property, and only while it is being set up
+        (DOMAIN §5, owner portal); after that, changes go through the IKE. Another owner's
+        property is "not found", so the portal never tells that it exists."""
+        if owner_id != self.owner_id:
+            raise PropertyNotFound(f"no property has id {self.id}")
+        if self.status is not PropertyStatus.ONBOARDING:
+            raise ChangeThroughTheIke("property")
 
     def _refuse_if_offboarded(self, action: str) -> None:
         if self.status is PropertyStatus.OFFBOARDED:

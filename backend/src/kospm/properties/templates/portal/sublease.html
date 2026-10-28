@@ -1,0 +1,13 @@
+{% extends "portal/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Sublease declaration" %}{% endblock %}
+{% block content %}
+  {% include "portal/_property_header.html" %}
+  <h1>{% translate "Sublease declaration" %}</h1>
+  <p class="lead">{% translate "The number of the sublease declaration that you or your accountant filed with AADE." %}</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "portal/form.html" with form=form %}
+    {% if editable %}<button type="submit" class="button">{% translate "Save" %}</button>{% endif %}
+  </form>
+{% endblock %}

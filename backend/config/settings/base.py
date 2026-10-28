@@ -104,6 +104,9 @@ OUTBOX_BATCH_SIZE = env.int("OUTBOX_BATCH_SIZE", default=100)
 PROPERTY_DEFAULT_CHECK_IN_TIME = "15:00"
 PROPERTY_DEFAULT_CHECK_OUT_TIME = "11:00"
 PROPERTY_DEFAULT_LINEN_PAR_LEVEL = 3
+# Codes given to the properties that owners add in the portal: KOS-001, KOS-002, ...
+PROPERTY_CODE_PREFIX = "KOS"
+PROPERTY_CODE_DIGITS = 3
 # Contract terms used when a signed contract does not state its own.
 CONTRACT_DEFAULT_COMMISSION_RATE = "0.15"
 CONTRACT_DEFAULT_OWNER_CLEANING_CHARGE = "40.00"
@@ -125,6 +128,8 @@ PORTAL_THROTTLE_MAX_ATTEMPTS = 10
 PORTAL_THROTTLE_WINDOW_SECONDS = 15 * 60
 # Request header with the visitor's address appended by the reverse proxy ("" = REMOTE_ADDR).
 PORTAL_CLIENT_IP_HEADER = ""
+# Largest file an owner may upload (photos, the signed contract), in megabytes.
+PORTAL_UPLOAD_MAX_MB = 15
 
 # --- Email: delivered by the outbox worker through this backend (ADR 0005, 0017) ---------------
 

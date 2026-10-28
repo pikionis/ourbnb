@@ -76,6 +76,7 @@ INVALID_VALUE_MESSAGES: dict[str, StrOrPromise] = {
     "exterior_photo": gettext_lazy("Upload a photo: JPG, PNG, WebP or HEIC."),
     "lockbox_photo": gettext_lazy("Upload a photo: JPG, PNG, WebP or HEIC."),
     "contract_document": gettext_lazy("Upload the signed contract as a PDF."),
+    "contract_draft": gettext_lazy("Upload the contract to sign as a PDF."),
     "signed_at": gettext_lazy("Enter the date and time the contract was signed."),
     "commission_rate": gettext_lazy(
         "The commission is a rate from 0 to below 1 (0.15 for 15 percent), with at most 4 decimals."

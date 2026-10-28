@@ -16,6 +16,7 @@ from decimal import Decimal
 from typing import assert_never
 from uuid import UUID
 
+from kospm.properties.domain.codes import PropertyCodeSeries
 from kospm.properties.domain.commands import (
     ActivateProperty,
     AssignAma,
@@ -24,6 +25,7 @@ from kospm.properties.domain.commands import (
     CreateProperty,
     DeactivateProperty,
     OffboardProperty,
+    OfferContract,
     RecordSubleaseDeclaration,
     RecordTestTransfer,
     RegisterOwner,
@@ -50,6 +52,7 @@ from kospm.properties.domain.value_objects import (
     Amenities,
     CheckInGuide,
     Contract,
+    ContractDraft,
     Email,
     GeoPoint,
     Iban,
@@ -175,11 +178,19 @@ def _payee_check(result: str, bank_name: str) -> PayeeCheck:
 
 
 def create_property(
-    cmd: CreateProperty, uow: PropertiesUnitOfWork, property_defaults: PropertyDefaults
+    cmd: CreateProperty,
+    uow: PropertiesUnitOfWork,
+    property_defaults: PropertyDefaults,
+    property_codes: PropertyCodeSeries,
 ) -> None:
-    code = PropertyCode(cmd.code)
+    """A new property of an owner. Without a code (the owner portal), it gets the next code of
+    the series (DOMAIN §5, owner portal)."""
     with uow:
-        uow.owners.get(cmd.owner_id)  # the owner must exist; read only, so it is not written
+        _owner(uow, cmd.owner_id, cmd.acting_owner_id)  # must exist; read only, not written
+        if cmd.code is None:
+            code = property_codes.next_code(uow.properties.codes_with_prefix(property_codes.prefix))
+        else:
+            code = PropertyCode(cmd.code)
         if uow.properties.find_by_code(code) is not None:
             raise PropertyCodeTaken(code.value)
         uow.properties.add(
@@ -204,6 +215,9 @@ def update_property_profile(cmd: UpdatePropertyProfile, uow: PropertiesUnitOfWor
 
 def apply_profile(prop: Property, cmd: UpdatePropertyProfile) -> None:
     """Apply a profile command to a property: the handler's work, without a Unit of Work."""
+    if cmd.acting_owner_id is not None:
+        prop.check_owner_may_change(cmd.acting_owner_id)
+        _refuse_what_the_ike_sets(prop, cmd)
     location = _location(cmd.lat, cmd.lng)
     amenities = Amenities(included=cmd.amenities_included, not_included=cmd.amenities_not_included)
     feeds = tuple(IcalFeed(channel=_channel(name), url=url) for name, url in cmd.ical_feeds)
@@ -237,11 +251,38 @@ def sign_contract(
     clock: Clock,
     property_defaults: PropertyDefaults,
 ) -> None:
-    contract = build_contract(cmd, property_defaults, now=clock.now())
+    now = clock.now()
     with uow:
         prop = uow.properties.get(cmd.property_id, expected_version=cmd.expected_version)
-        prop.sign_contract(contract)
+        apply_edit(prop, cmd, property_defaults=property_defaults, now=now)
         uow.commit()
+
+
+def offer_contract(
+    cmd: OfferContract,
+    uow: PropertiesUnitOfWork,
+    clock: Clock,
+    property_defaults: PropertyDefaults,
+) -> None:
+    with uow:
+        prop = uow.properties.get(cmd.property_id, expected_version=cmd.expected_version)
+        apply_edit(prop, cmd, property_defaults=property_defaults, now=clock.now())
+        uow.commit()
+
+
+def build_draft(cmd: OfferContract, defaults: PropertyDefaults) -> ContractDraft:
+    """The contract to sign an OfferContract command records: terms it omits take the defaults."""
+    return ContractDraft(
+        document=cmd.document,
+        commission_rate=(
+            defaults.commission_rate if cmd.commission_rate is None else cmd.commission_rate
+        ),
+        owner_cleaning_charge=(
+            defaults.owner_cleaning_charge
+            if cmd.owner_cleaning_charge is None
+            else Money(cmd.owner_cleaning_charge)
+        ),
+    )
 
 
 def build_contract(cmd: SignContract, defaults: PropertyDefaults, *, now: datetime) -> Contract:
@@ -261,7 +302,9 @@ def build_contract(cmd: SignContract, defaults: PropertyDefaults, *, now: dateti
 
 
 # The commands a property form sends after the property exists (onboarding steps 2-5).
-type PropertyEdit = UpdatePropertyProfile | SignContract | RecordSubleaseDeclaration | AssignAma
+type PropertyEdit = (
+    UpdatePropertyProfile | OfferContract | SignContract | RecordSubleaseDeclaration | AssignAma
+)
 
 
 def apply_edit(
@@ -275,9 +318,17 @@ def apply_edit(
     match cmd:
         case UpdatePropertyProfile():
             apply_profile(prop, cmd)
+        case OfferContract():
+            prop.offer_contract(build_draft(cmd, property_defaults))
+        case SignContract() if cmd.acting_owner_id is not None:
+            # The owner signs the draft the IKE offered, with its terms (DOMAIN §5).
+            prop.check_owner_may_change(cmd.acting_owner_id)
+            prop.sign_offered_contract(cmd.document, signed_at=now)
         case SignContract():
             prop.sign_contract(build_contract(cmd, property_defaults, now=now))
         case RecordSubleaseDeclaration():
+            if cmd.acting_owner_id is not None:
+                prop.check_owner_may_change(cmd.acting_owner_id)
             prop.record_sublease_declaration(cmd.number)
         case AssignAma():
             prop.assign_ama(cmd.ama_number)
@@ -285,10 +336,15 @@ def apply_edit(
             assert_never(cmd)
 
 
-def record_sublease_declaration(cmd: RecordSubleaseDeclaration, uow: PropertiesUnitOfWork) -> None:
+def record_sublease_declaration(
+    cmd: RecordSubleaseDeclaration,
+    uow: PropertiesUnitOfWork,
+    clock: Clock,
+    property_defaults: PropertyDefaults,
+) -> None:
     with uow:
         prop = uow.properties.get(cmd.property_id, expected_version=cmd.expected_version)
-        prop.record_sublease_declaration(cmd.number)
+        apply_edit(prop, cmd, property_defaults=property_defaults, now=clock.now())
         uow.commit()
 
 
@@ -354,6 +410,27 @@ def _keep_if_none(new: str | None, stored: str) -> str:
     return stored if new is None else new
 
 
+def _refuse_what_the_ike_sets(prop: Property, cmd: UpdatePropertyProfile) -> None:
+    """An owner's profile carries the IKE's settings unchanged: calendar feeds, preferred
+    cleaner, linen sets, check-in/out times (DOMAIN §5, owner portal)."""
+    sent = (
+        {(channel, url.strip()) for channel, url in cmd.ical_feeds},
+        cmd.preferred_cleaner_id,
+        cmd.linen_par_level,
+        cmd.default_check_in_time,
+        cmd.default_check_out_time,
+    )
+    stored = (
+        {(feed.channel.value, feed.url) for feed in prop.ical_feeds},
+        prop.preferred_cleaner_id,
+        prop.linen_par_level,
+        prop.default_check_in_time,
+        prop.default_check_out_time,
+    )
+    if sent != stored:
+        raise ChangeThroughTheIke("property")
+
+
 COMMAND_HANDLERS: dict[type[Command], Callable[..., None]] = {
     RegisterOwner: register_owner,
     UpdateOwnerDetails: update_owner_details,
@@ -363,6 +440,7 @@ COMMAND_HANDLERS: dict[type[Command], Callable[..., None]] = {
     ConfirmBankAccount: confirm_bank_account,
     CreateProperty: create_property,
     UpdatePropertyProfile: update_property_profile,
+    OfferContract: offer_contract,
     SignContract: sign_contract,
     RecordSubleaseDeclaration: record_sublease_declaration,
     AssignAma: assign_ama,

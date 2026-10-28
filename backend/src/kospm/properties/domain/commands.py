@@ -80,10 +80,13 @@ class ConfirmBankAccount(Command):
 
 @dataclass(frozen=True, kw_only=True)
 class CreateProperty(Command):
+    """A new property. Without a code (the owner portal), it gets the next one of the series."""
+
     property_id: UUID
     owner_id: UUID
-    code: str
     name: str
+    code: str | None = None
+    acting_owner_id: UUID | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -110,11 +113,24 @@ class UpdatePropertyProfile(Command):
     linen_par_level: int
     preferred_cleaner_id: UUID | None
     expected_version: int | None = None
+    acting_owner_id: UUID | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class OfferContract(Command):
+    """The IKE uploads the contract to sign (its PDF). Missing terms take the defaults."""
+
+    property_id: UUID
+    document: str
+    commission_rate: Decimal | None = None
+    owner_cleaning_charge: Decimal | None = None
+    expected_version: int | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
 class SignContract(Command):
-    """Record the signed contract. Missing terms take the configured defaults."""
+    """Record the signed contract. Missing terms take the configured defaults; an owner (the
+    portal) signs the offered draft, whose terms the contract takes."""
 
     property_id: UUID
     document: str
@@ -122,6 +138,7 @@ class SignContract(Command):
     commission_rate: Decimal | None = None
     owner_cleaning_charge: Decimal | None = None
     expected_version: int | None = None
+    acting_owner_id: UUID | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -129,6 +146,7 @@ class RecordSubleaseDeclaration(Command):
     property_id: UUID
     number: str
     expected_version: int | None = None
+    acting_owner_id: UUID | None = None
 
 
 @dataclass(frozen=True, kw_only=True)

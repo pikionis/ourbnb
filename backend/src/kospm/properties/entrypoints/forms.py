@@ -32,6 +32,7 @@ from kospm.properties.adapters.repository import property_to_domain
 from kospm.properties.domain.commands import (
     AssignAma,
     CreateProperty,
+    OfferContract,
     RecordSubleaseDeclaration,
     SignContract,
     UpdatePropertyProfile,
@@ -58,6 +59,11 @@ CONTRACT_FIELDS = (
     "contract_commission_rate",
     "contract_owner_cleaning_charge",
 )
+DRAFT_FIELDS = (
+    "contract_draft_document",
+    "contract_draft_commission_rate",
+    "contract_draft_owner_cleaning_charge",
+)
 LEGAL_NUMBER_FIELDS = ("sublease_declaration_number", "ama_number")
 
 # Where a value the domain refuses (InvalidValue.field) is shown on the property form.
@@ -70,6 +76,7 @@ PROPERTY_FORM_FIELDS = {
     "amenities": "amenities_not_included_text",
     "linen_par_level": "linen_par_level",
     "contract_document": "contract_document",
+    "contract_draft": "contract_draft_document",
     "signed_at": "contract_signed_at",
     "commission_rate": "contract_commission_rate",
     "owner_cleaning_charge": "contract_owner_cleaning_charge",
@@ -188,6 +195,7 @@ class PropertyForm(forms.ModelForm[models.Property]):
             "map_url",
             "exterior_photo",
             "lockbox_photo",
+            *DRAFT_FIELDS,
             *CONTRACT_FIELDS,
             *LEGAL_NUMBER_FIELDS,
         )
@@ -264,6 +272,15 @@ class PropertyForm(forms.ModelForm[models.Property]):
     ) -> list[PropertyEdit]:
         data = self.cleaned_data
         edits: list[PropertyEdit] = [self._profile_command(property_id, preview, version)]
+        if any(name in self.changed_data for name in DRAFT_FIELDS):
+            edits.append(
+                OfferContract(
+                    property_id=property_id,
+                    document=self._file_name("contract_draft_document", preview=preview),
+                    commission_rate=data.get("contract_draft_commission_rate"),
+                    owner_cleaning_charge=data.get("contract_draft_owner_cleaning_charge"),
+                )
+            )
         if any(name in self.changed_data for name in CONTRACT_FIELDS):
             edits.append(
                 SignContract(

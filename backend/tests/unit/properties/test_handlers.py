@@ -13,6 +13,7 @@ import pytest
 
 from kospm.bootstrap import ContextWiring, bootstrap
 from kospm.properties.domain.checklist import ActivationRequirement
+from kospm.properties.domain.codes import PropertyCodeSeries
 from kospm.properties.domain.commands import (
     ActivateProperty,
     AssignAma,
@@ -21,6 +22,7 @@ from kospm.properties.domain.commands import (
     CreateProperty,
     DeactivateProperty,
     OffboardProperty,
+    OfferContract,
     RecordSubleaseDeclaration,
     RecordTestTransfer,
     RegisterOwner,
@@ -34,6 +36,7 @@ from kospm.properties.domain.errors import (
     BankAccountAlreadyVerified,
     ChangeThroughTheIke,
     InvalidValue,
+    NoContractToSign,
     OwnerAlreadyRegistered,
     OwnerNotFound,
     PropertyCodeTaken,
@@ -92,6 +95,7 @@ class Harness:
                     },
                     dependencies={
                         "property_defaults": PropertyDefaults(),
+                        "property_codes": PropertyCodeSeries(),
                         "bank_verification": BankVerificationPolicy(max_attempts=3),
                         "bank_account_verifier": self.verifier,
                     },
@@ -433,6 +437,113 @@ class TestProperties:
     def test_unknown_property(self, harness: Harness) -> None:
         with pytest.raises(PropertyNotFound):
             harness.bus.handle(ActivateProperty(property_id=new_id()))
+
+
+class TestOwnerPortalProperties:
+    """Property commands sent from the owner portal name the acting owner (ADR 0017)."""
+
+    def add_property(self, harness: Harness, owner_id: UUID, acting: UUID | None = None) -> UUID:
+        property_id = new_id()
+        harness.bus.handle(
+            CreateProperty(
+                property_id=property_id,
+                owner_id=owner_id,
+                name="Villa Elena",
+                acting_owner_id=acting or owner_id,
+            )
+        )
+        return property_id
+
+    def test_an_owner_adds_a_property_and_it_gets_the_next_code(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        harness.create_property(owner_id, "KOS-005")
+        added = harness.property(self.add_property(harness, owner_id))
+        assert added.code == PropertyCode("KOS-006")
+        assert added.status is PropertyStatus.ONBOARDING
+
+    def test_an_owner_adds_properties_only_for_themself(self, harness: Harness) -> None:
+        maria = harness.register_owner()
+        nikos = harness.register_owner(afm=OTHER_VALID_AFM, email="nikos@example.com")
+        with pytest.raises(OwnerNotFound):
+            self.add_property(harness, maria, acting=nikos)
+
+    def test_an_owner_completes_only_their_own_profile(self, harness: Harness) -> None:
+        maria = harness.register_owner()
+        nikos = harness.register_owner(afm=OTHER_VALID_AFM, email="nikos@example.com")
+        property_id = self.add_property(harness, maria)
+        harness.complete_profile(property_id, acting_owner_id=maria)
+        assert harness.property(property_id).profile_gaps() == []
+        with pytest.raises(PropertyNotFound):
+            harness.complete_profile(property_id, acting_owner_id=nikos, name="Δικό μου")
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            {"ical_feeds": (("airbnb", "https://www.airbnb.com/calendar/ical/1.ics"),)},
+            {"linen_par_level": 5},
+            {"default_check_in_time": time(14)},
+            {"preferred_cleaner_id": new_id()},
+        ],
+    )
+    def test_an_owner_never_changes_what_the_ike_sets(
+        self, harness: Harness, change: dict[str, Any]
+    ) -> None:
+        owner_id = harness.register_owner()
+        property_id = self.add_property(harness, owner_id)
+        with pytest.raises(ChangeThroughTheIke):
+            harness.complete_profile(property_id, acting_owner_id=owner_id, **change)
+
+    def test_an_owner_signs_the_contract_the_ike_offered_with_its_terms(
+        self, harness: Harness
+    ) -> None:
+        owner_id = harness.register_owner()
+        property_id = self.add_property(harness, owner_id)
+        harness.bus.handle(
+            OfferContract(
+                property_id=property_id,
+                document="contracts/drafts/a.pdf",
+                commission_rate=Decimal("0.18"),
+            )
+        )
+        harness.bus.handle(
+            SignContract(
+                property_id=property_id,
+                document="contracts/a-signed.pdf",
+                acting_owner_id=owner_id,
+            )
+        )
+        contract = harness.property(property_id).contract
+        assert (contract.commission_rate, contract.owner_cleaning_charge, contract.signed_at) == (
+            Decimal("0.18"),
+            Money("40.00"),
+            NOW,
+        )
+
+    def test_no_signed_contract_before_the_ike_offers_one(self, harness: Harness) -> None:
+        owner_id = harness.register_owner()
+        property_id = self.add_property(harness, owner_id)
+        with pytest.raises(NoContractToSign):
+            harness.bus.handle(
+                SignContract(
+                    property_id=property_id, document="contracts/a.pdf", acting_owner_id=owner_id
+                )
+            )
+
+    def test_an_owner_records_the_sublease_number_until_the_property_works(
+        self, harness: Harness
+    ) -> None:
+        owner_id = harness.register_owner()
+        property_id = harness.create_property(owner_id)
+        record = RecordSubleaseDeclaration(
+            property_id=property_id, number="ΔΥ-1", acting_owner_id=owner_id
+        )
+        harness.bus.handle(record)
+        harness.complete_profile(property_id)
+        harness.do_legal_steps(property_id)
+        harness.verify_bank_account(owner_id)
+        harness.bus.handle(ActivateProperty(property_id=property_id))
+        with pytest.raises(ChangeThroughTheIke):
+            harness.bus.handle(record)
 
 
 class TestActivation:

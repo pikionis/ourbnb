@@ -44,6 +44,7 @@ from kospm.identity.service_layer.ports import AccountTokens
 from kospm.identity.service_layer.unit_of_work import IdentityUnitOfWork
 from kospm.properties.adapters.bank_verification import ManualBankAccountVerifier
 from kospm.properties.adapters.unit_of_work import DjangoPropertiesUnitOfWork
+from kospm.properties.domain.codes import PropertyCodeSeries
 from kospm.properties.domain.defaults import BankVerificationPolicy, PropertyDefaults
 from kospm.properties.domain.events import OwnerEmailChanged, OwnerRegistered
 from kospm.properties.service_layer import handlers as properties_handlers
@@ -220,6 +221,7 @@ def properties_dependencies() -> dict[str, object]:
     """The configuration objects and adapters of the properties handlers, from the settings."""
     return {
         "property_defaults": property_defaults(),
+        "property_codes": property_code_series(),
         "bank_verification": _bank_verification_policy(),
         # The admin sends the test transfer by hand until a provider is chosen (Phase 2b).
         "bank_account_verifier": ManualBankAccountVerifier(),
@@ -241,6 +243,16 @@ def property_defaults() -> PropertyDefaults:
             "invalid property defaults (PROPERTY_DEFAULT_*, CONTRACT_DEFAULT_*): "
             f"{type(error).__name__}: {error}"
         ) from error
+
+
+def property_code_series() -> PropertyCodeSeries:
+    """The codes given to properties that owners add (PROPERTY_CODE_PREFIX, _DIGITS)."""
+    try:
+        return PropertyCodeSeries(
+            prefix=str(settings.PROPERTY_CODE_PREFIX), digits=int(settings.PROPERTY_CODE_DIGITS)
+        )
+    except (TypeError, ValueError) as error:
+        raise ImproperlyConfigured(f"invalid PROPERTY_CODE_*: {error}") from error
 
 
 def _bank_verification_policy() -> BankVerificationPolicy:

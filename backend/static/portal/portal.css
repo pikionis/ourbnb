@@ -216,7 +216,28 @@ textarea { min-height: 7rem; resize: vertical; }
 .state-missing { background: var(--missing); }
 
 .cards .card { margin-top: 0.75rem; }
+.property-card { display: flex; flex-direction: column; gap: 0.25rem; color: var(--text); text-decoration: none; }
+.property-card:hover { border-color: var(--accent); color: var(--text); }
 .property-name { margin-bottom: 0.25rem; }
+
+.steps { padding-left: 1.25rem; }
+.steps li { margin-bottom: 0.5rem; }
+
+.amenities { display: grid; gap: 0.5rem; margin-bottom: 1.25rem; }
+.amenity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.amenity legend { float: left; flex: 1; min-width: 10rem; padding: 0; font-weight: 600; }
+.choice { display: inline-flex; align-items: center; gap: 0.35rem; min-height: 44px; }
+input[type="file"] { width: 100%; padding: 0.5rem 0; font: inherit; }
 
 .label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
 .readonly-value { font-size: 1.05rem; margin-bottom: 0.25rem; overflow-wrap: anywhere; }

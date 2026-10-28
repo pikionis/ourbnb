@@ -79,6 +79,9 @@ class FakePropertyRepository(PropertyRepository):
             self._track(prop) for prop in self._properties.values() if prop.owner_id == owner_id
         ]
 
+    def codes_with_prefix(self, prefix: str) -> list[PropertyCode]:
+        return [p.code for p in self._properties.values() if p.code.value.startswith(f"{prefix}-")]
+
     def all(self) -> list[Property]:
         """Every stored property, untracked: for assertions."""
         return list(self._properties.values())

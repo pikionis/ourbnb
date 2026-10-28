@@ -31,6 +31,7 @@ from kospm.properties.domain.value_objects import (
     Amenities,
     CheckInGuide,
     Contract,
+    ContractDraft,
     Email,
     GeoPoint,
     Iban,
@@ -147,6 +148,17 @@ def property_to_domain(row: models.Property) -> Property:
         and row.contract_owner_cleaning_charge is not None
         else None
     )
+    draft = (
+        ContractDraft(
+            document=row.contract_draft_document.name,
+            commission_rate=row.contract_draft_commission_rate,
+            owner_cleaning_charge=Money(row.contract_draft_owner_cleaning_charge),
+        )
+        if row.contract_draft_document
+        and row.contract_draft_commission_rate is not None
+        and row.contract_draft_owner_cleaning_charge is not None
+        else None
+    )
     return Property(
         row.id,
         owner_id=row.owner_id,
@@ -176,6 +188,7 @@ def property_to_domain(row: models.Property) -> Property:
             IcalFeed(channel=IcalChannel(feed["channel"]), url=feed["url"])
             for feed in row.ical_feeds
         ),
+        contract_draft=draft,
         contract=contract,
         sublease_declaration_number=row.sublease_declaration_number,
         ama_number=row.ama_number,
@@ -185,6 +198,7 @@ def property_to_domain(row: models.Property) -> Property:
 def property_values(prop: Property) -> dict[str, Any]:
     guide = prop.check_in_guide
     contract = prop.contract
+    draft = prop.contract_draft
     return {
         "owner_id": prop.owner_id,
         "code": prop.code.value,
@@ -213,6 +227,11 @@ def property_values(prop: Property) -> dict[str, Any]:
         ),
         "contract_signed_at": None if contract is None else contract.signed_at,
         "contract_document": "" if contract is None else contract.document,
+        "contract_draft_document": "" if draft is None else draft.document,
+        "contract_draft_commission_rate": None if draft is None else draft.commission_rate,
+        "contract_draft_owner_cleaning_charge": (
+            None if draft is None else draft.owner_cleaning_charge.amount
+        ),
         "sublease_declaration_number": prop.sublease_declaration_number,
         "ama_number": prop.ama_number,
     }
@@ -235,6 +254,10 @@ class DjangoPropertyRepository(VersionedDjangoRepository[Property], PropertyRepo
     def list_by_owner(self, owner_id: UUID) -> list[Property]:
         rows = models.Property.objects.using(self.using).filter(owner_id=owner_id)
         return [self._load(property_to_domain(row), row.version) for row in rows]
+
+    def codes_with_prefix(self, prefix: str) -> list[PropertyCode]:
+        codes = models.Property.objects.using(self.using).filter(code__startswith=f"{prefix}-")
+        return [PropertyCode(code) for code in codes.values_list("code", flat=True)]
 
     def _values(self, prop: Property) -> dict[str, Any]:
         return property_values(prop)

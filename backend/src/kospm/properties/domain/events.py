@@ -34,6 +34,13 @@ class PropertyProfileCompleted(DomainEvent):
 
 
 @dataclass(frozen=True, kw_only=True)
+class ContractOffered(DomainEvent):
+    """The IKE uploaded the contract to sign for a property."""
+
+    property_id: UUID
+
+
+@dataclass(frozen=True, kw_only=True)
 class ContractSigned(DomainEvent):
     property_id: UUID
 

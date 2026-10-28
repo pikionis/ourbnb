@@ -373,6 +373,20 @@ class PropertyAdmin(CommandModelAdmin[models.Property]):
                 },
             ),
             (
+                _("Contract to sign"),
+                {
+                    "fields": (
+                        "contract_draft_document",
+                        "contract_draft_commission_rate",
+                        "contract_draft_owner_cleaning_charge",
+                    ),
+                    "description": _(
+                        "The PDF the owner downloads in the portal, signs and uploads signed. "
+                        "Terms left empty take the defaults."
+                    ),
+                },
+            ),
+            (
                 _("Contract and legal"),
                 {
                     "fields": (

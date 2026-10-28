@@ -1,0 +1,13 @@
+{% extends "portal/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Add a property" %}{% endblock %}
+{% block content %}
+  <p><a href="{% url 'portal:dashboard' %}">‹ {% translate "Home" %}</a></p>
+  <h1>{% translate "Add a property" %}</h1>
+  <p class="lead">{% translate "Give it a name you will recognise, e.g. Villa Elena. We give it a code that guests will use." %}</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "portal/form.html" with form=form %}
+    <button type="submit" class="button">{% translate "Add" %}</button>
+  </form>
+{% endblock %}

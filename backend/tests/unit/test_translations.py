@@ -18,7 +18,7 @@ SOURCES = (BACKEND / "src", BACKEND / "config")
 TEMPLATE_ROOTS = (BACKEND / "src", BACKEND / "templates")
 CATALOGUE = BACKEND / "locale" / "el" / "LC_MESSAGES" / "django.mo"
 TRANSLATION_CALLS = frozenset({"_", "gettext", "gettext_lazy", "ngettext", "ngettext_lazy"})
-SAME_IN_GREEK = frozenset({"IBAN", "WhatsApp", "Email", "email"})
+SAME_IN_GREEK = frozenset({"IBAN", "WhatsApp", "Email", "email", "Wi-Fi"})
 # What Django's templatize() writes for {% translate %} and {% blocktranslate %}: gettext calls
 # (ngettext for a counted blocktranslate) with Python string literals.
 _LITERAL = r"""u?(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")"""

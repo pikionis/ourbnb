@@ -45,17 +45,20 @@
     {% if properties %}
       <ul class="cards">
         {% for item in properties %}
-          <li class="card property-card">
-            <p class="property-name"><strong>{{ item.summary.name }}</strong> · {{ item.summary.code }}</p>
-            <p class="state-text">{{ item.status }} · {% blocktranslate trimmed with ready=item.summary.ready total=item.summary.total %}{{ ready }} of {{ total }} ready{% endblocktranslate %}</p>
-            {% if item.missing %}
-              <p class="fine-print">{% translate "Missing:" %} {{ item.missing|join:", " }}</p>
-            {% endif %}
+          <li>
+            <a class="card property-card" href="{% url 'portal:property' item.summary.code %}">
+              <span class="property-name"><strong>{{ item.summary.name }}</strong> · {{ item.summary.code }}</span>
+              <span class="state-text">{{ item.status }} · {% blocktranslate trimmed with ready=item.summary.ready total=item.summary.total %}{{ ready }} of {{ total }} ready{% endblocktranslate %}</span>
+              {% if item.missing %}
+                <span class="fine-print">{% translate "Missing:" %} {{ item.missing|join:", " }}</span>
+              {% endif %}
+            </a>
           </li>
         {% endfor %}
       </ul>
     {% else %}
       <p>{% translate "You have no properties with us yet." %}</p>
     {% endif %}
+    <a class="button button-secondary" href="{% url 'portal:property_new' %}">+ {% translate "Add a property" %}</a>
   {% endif %}
 {% endblock %}
