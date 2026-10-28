@@ -31,6 +31,7 @@ from kospm.properties.domain.events import (
     ContractOffered,
     ContractSigned,
     PropertyActivated,
+    PropertyCalendarSettingsChanged,
     PropertyDeactivated,
     PropertyOffboarded,
     PropertyProfileCompleted,
@@ -111,7 +112,7 @@ class Property(Aggregate[UUID]):
         defaults: PropertyDefaults,
     ) -> Self:
         """A new property of an owner, onboarding, with the configured defaults."""
-        return cls(
+        prop = cls(
             property_id,
             owner_id=owner_id,
             code=code,
@@ -120,6 +121,8 @@ class Property(Aggregate[UUID]):
             default_check_out_time=defaults.check_out_time,
             linen_par_level=defaults.linen_par_level,
         )
+        prop.announce_calendar_settings()
+        return prop
 
     # --- profile ----------------------------------------------------------------------------
 
@@ -150,6 +153,7 @@ class Property(Aggregate[UUID]):
         if gaps and self.status is PropertyStatus.ACTIVE:
             raise ProfileMustStayComplete(gaps)
         was_complete = not self.profile_gaps()
+        calendar_settings = self._calendar_settings()
 
         self.name = name
         self.address = address
@@ -164,6 +168,7 @@ class Property(Aggregate[UUID]):
 
         if not gaps and not was_complete:
             self.events.append(PropertyProfileCompleted(property_id=self.id))
+        self._announce_if_changed(calendar_settings)
 
     def profile_gaps(self) -> list[ProfileItem]:
         """Parts of the profile still missing, in checklist order."""
@@ -256,6 +261,7 @@ class Property(Aggregate[UUID]):
         else:
             self.events.append(PropertyReactivated(property_id=self.id))
         self.status = PropertyStatus.ACTIVE
+        self.announce_calendar_settings()  # its feeds are synced from now on
 
     def deactivate(self) -> None:
         """Pause an active property (Ανενεργό). It can be activated again."""
@@ -263,12 +269,15 @@ class Property(Aggregate[UUID]):
             raise InvalidStatusTransition(self.status.value, "deactivate")
         self.status = PropertyStatus.INACTIVE
         self.events.append(PropertyDeactivated(property_id=self.id))
+        self.announce_calendar_settings()  # no more syncs
 
     def offboard(self) -> None:
         """The property leaves the IKE's management. Final."""
         self._refuse_if_offboarded("offboard")
+        calendar_settings = self._calendar_settings()
         self.status = PropertyStatus.OFFBOARDED
         self.events.append(PropertyOffboarded(property_id=self.id))
+        self._announce_if_changed(calendar_settings)
 
     # --- the owner portal ----------------------------------------------------------------------
 
@@ -285,6 +294,37 @@ class Property(Aggregate[UUID]):
             raise PropertyNotFound(f"no property has id {self.id}")
         if not self.owner_may_change:
             raise ChangeThroughTheIke("property")
+
+    # --- the reservations context's copy (DOMAIN §4.1) -----------------------------------------
+
+    def announce_calendar_settings(self) -> None:
+        """Tell the reservations context what it keeps of this property: on every change, and
+        on demand for the properties that existed before (the `announce_calendar_settings`
+        command)."""
+        self.events.append(
+            PropertyCalendarSettingsChanged(
+                property_id=self.id,
+                code=self.code.value,
+                name=self.name,
+                active=self.status is PropertyStatus.ACTIVE,
+                check_in_time=self.default_check_in_time,
+                check_out_time=self.default_check_out_time,
+                ical_feeds=tuple((feed.channel.value, feed.url) for feed in self.ical_feeds),
+            )
+        )
+
+    def _calendar_settings(self) -> tuple[object, ...]:
+        return (
+            self.name,
+            self.status is PropertyStatus.ACTIVE,
+            self.default_check_in_time,
+            self.default_check_out_time,
+            self.ical_feeds,
+        )
+
+    def _announce_if_changed(self, before: tuple[object, ...]) -> None:
+        if self._calendar_settings() != before:
+            self.announce_calendar_settings()
 
     def _refuse_if_offboarded(self, action: str) -> None:
         if self.status is PropertyStatus.OFFBOARDED:

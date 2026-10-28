@@ -5,6 +5,7 @@ they are logged by type and read by other contexts.
 """
 
 from dataclasses import dataclass
+from datetime import time
 from uuid import UUID
 
 from kospm.shared.domain import DomainEvent
@@ -58,8 +59,28 @@ class AmaAssigned(DomainEvent):
 
 
 @dataclass(frozen=True, kw_only=True)
+class PropertyCalendarSettingsChanged(DomainEvent):
+    """What the reservations context keeps of a property changed (DOMAIN §4.1).
+
+    The whole state, so the newest event is always the truth:
+    - the code and the name;
+    - `active`, since only an ACTIVE property's feeds are synced;
+    - the default check-in/out times;
+    - the feeds, as (channel, url) pairs.
+    """
+
+    property_id: UUID
+    code: str
+    name: str
+    active: bool
+    check_in_time: time
+    check_out_time: time
+    ical_feeds: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, kw_only=True)
 class PropertyActivated(DomainEvent):
-    """First activation: reservations starts the iCal sync, the owner is asked for consent."""
+    """First activation: the owner is asked for consent to the public website."""
 
     property_id: UUID
     owner_id: UUID

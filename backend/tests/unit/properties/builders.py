@@ -101,13 +101,16 @@ def airbnb_feed() -> IcalFeed:
 def new_property(
     *, property_id: UUID | None = None, owner_id: UUID | None = None, code: str = "KOS-A1"
 ) -> Property:
-    return Property.create(
+    """A property just created, its creation's announcement already published."""
+    prop = Property.create(
         property_id=property_id or new_id(),
         owner_id=owner_id or new_id(),
         code=PropertyCode(code),
         name="Σπίτι Αιγαίου",
         defaults=PropertyDefaults(),
     )
+    prop.events.clear()
+    return prop
 
 
 def ready_property(*, owner_id: UUID | None = None, code: str = "KOS-A1") -> Property:

@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from kospm.properties.domain.checklist import ActivationRequirement, ProfileItem
+from kospm.properties.domain.defaults import PropertyDefaults
 from kospm.properties.domain.errors import (
     InvalidStatusTransition,
     InvalidValue,
@@ -16,6 +17,7 @@ from kospm.properties.domain.events import (
     AmaAssigned,
     ContractSigned,
     PropertyActivated,
+    PropertyCalendarSettingsChanged,
     PropertyDeactivated,
     PropertyOffboarded,
     PropertyProfileCompleted,
@@ -23,7 +25,8 @@ from kospm.properties.domain.events import (
     SubleaseDeclared,
 )
 from kospm.properties.domain.property import Property, PropertyStatus
-from kospm.properties.domain.value_objects import Amenities, IcalChannel, IcalFeed
+from kospm.properties.domain.value_objects import Amenities, IcalChannel, IcalFeed, PropertyCode
+from kospm.shared.domain import DomainEvent, new_id
 from tests.unit.properties.builders import (
     airbnb_feed,
     complete_guide,
@@ -49,6 +52,10 @@ def active_property() -> Property:
     return prop
 
 
+def settings_announced(events: list[DomainEvent]) -> list[PropertyCalendarSettingsChanged]:
+    return [event for event in events if isinstance(event, PropertyCalendarSettingsChanged)]
+
+
 class TestCreation:
     def test_a_new_property_is_onboarding_with_the_configured_defaults(self) -> None:
         prop = new_property()
@@ -60,6 +67,57 @@ class TestCreation:
     def test_needs_a_name(self) -> None:
         with pytest.raises(InvalidValue):
             new_property().update_profile(**complete_profile(name=" "))
+
+
+class TestReservationsCopy:
+    """The reservations context keeps a copy of a property's calendar settings (DOMAIN §4.1)."""
+
+    def test_a_new_property_is_announced(self) -> None:
+        prop = Property.create(
+            property_id=new_id(),
+            owner_id=new_id(),
+            code=PropertyCode("KOS-A1"),
+            name="Σπίτι Αιγαίου",
+            defaults=PropertyDefaults(),
+        )
+        assert prop.events == [
+            PropertyCalendarSettingsChanged(
+                property_id=prop.id,
+                code="KOS-A1",
+                name="Σπίτι Αιγαίου",
+                active=False,
+                check_in_time=time(15),
+                check_out_time=time(11),
+                ical_feeds=(),
+            )
+        ]
+
+    def test_new_feeds_name_or_times_are_announced(self) -> None:
+        prop = new_property()
+        prop.update_profile(**complete_profile(ical_feeds=(airbnb_feed(),)))
+        (announced,) = settings_announced(prop.events)
+        assert announced.ical_feeds == (("airbnb", airbnb_feed().url),)
+        prop.events.clear()
+        prop.update_profile(
+            **complete_profile(ical_feeds=(airbnb_feed(),), default_check_in_time=time(14))
+        )
+        assert [settings.check_in_time for settings in settings_announced(prop.events)] == [
+            time(14)
+        ]
+
+    def test_other_profile_changes_are_not_announced(self) -> None:
+        prop = new_property()
+        prop.update_profile(**complete_profile())
+        prop.events.clear()
+        prop.update_profile(**complete_profile(address="Ψαλίδι, Κως"))
+        assert settings_announced(prop.events) == []
+
+    def test_offboarding_a_property_never_activated_changes_nothing_for_reservations(
+        self,
+    ) -> None:
+        prop = new_property()
+        prop.offboard()
+        assert settings_announced(prop.events) == []
 
 
 class TestActivationChecklist:
@@ -96,9 +154,10 @@ class TestActivationChecklist:
         prop = ready_property()
         prop.activate(owner_bank_account_verified=True)
         assert prop.status is PropertyStatus.ACTIVE
-        assert prop.events == [
-            PropertyActivated(property_id=prop.id, owner_id=prop.owner_id, code=prop.code.value)
-        ]
+        assert prop.events[0] == PropertyActivated(
+            property_id=prop.id, owner_id=prop.owner_id, code=prop.code.value
+        )
+        assert [settings.active for settings in settings_announced(prop.events)] == [True]
 
     def test_items_can_be_completed_in_any_order(self) -> None:
         prop = new_property()
@@ -134,12 +193,16 @@ class TestProfile:
 
     def test_completing_the_profile_is_announced_once(self) -> None:
         prop = new_property()
+
+        def completed() -> list[DomainEvent]:
+            return [e for e in prop.events if isinstance(e, PropertyProfileCompleted)]
+
         prop.update_profile(**complete_profile(address=""))
-        assert prop.events == []
+        assert completed() == []
         prop.update_profile(**complete_profile())
-        assert prop.events == [PropertyProfileCompleted(property_id=prop.id)]
+        assert completed() == [PropertyProfileCompleted(property_id=prop.id)]
         prop.update_profile(**complete_profile(name="Άλλο όνομα"))
-        assert prop.events == [PropertyProfileCompleted(property_id=prop.id)]
+        assert completed() == [PropertyProfileCompleted(property_id=prop.id)]
 
     def test_one_feed_per_channel(self) -> None:
         second_airbnb = IcalFeed(
@@ -196,7 +259,8 @@ class TestStates:
         prop = active_property()
         prop.deactivate()
         assert prop.status is PropertyStatus.INACTIVE
-        assert prop.events == [PropertyDeactivated(property_id=prop.id)]
+        assert prop.events[0] == PropertyDeactivated(property_id=prop.id)
+        assert [settings.active for settings in settings_announced(prop.events)] == [False]
 
     def test_an_inactive_property_comes_back_after_the_checklist_is_checked_again(self) -> None:
         prop = active_property()
@@ -205,7 +269,8 @@ class TestStates:
             prop.activate(owner_bank_account_verified=False)
         prop.activate(owner_bank_account_verified=True)
         assert prop.status is PropertyStatus.ACTIVE
-        assert prop.events[-1] == PropertyReactivated(property_id=prop.id)
+        assert PropertyReactivated(property_id=prop.id) in prop.events
+        assert settings_announced(prop.events)[-1].active
 
     @pytest.mark.parametrize("status", ["onboarding", "inactive"])
     def test_only_an_active_property_can_be_deactivated(self, status: str) -> None:
@@ -227,7 +292,8 @@ class TestStates:
             prop.events.clear()
         prop.offboard()
         assert prop.status is PropertyStatus.OFFBOARDED
-        assert prop.events == [PropertyOffboarded(property_id=prop.id)]
+        assert prop.events[0] == PropertyOffboarded(property_id=prop.id)
+        assert all(not settings.active for settings in settings_announced(prop.events))
 
     @pytest.mark.parametrize(
         "change",
