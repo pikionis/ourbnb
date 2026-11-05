@@ -1,6 +1,6 @@
 # 0009 — Public website: Next.js reading a small public API (v3)
 
-- Status: accepted
+- Status: accepted; amended by 0021 (the site is served at ourbnb.gr by the same Caddy as KosPM)
 - Date: 2026-10-22
 
 ## Context

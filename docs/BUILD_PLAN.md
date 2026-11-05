@@ -71,6 +71,7 @@ kospm/
 | 0011 | WhatsApp | Meta WhatsApp Cloud API; templates versioned in code |
 | 0012 | Data sources | iCal + manual entry + CSV uploads only. No scraping, no stored third-party passwords |
 | 0013 | Tooling | uv, ruff, mypy, pytest, import-linter, GitHub Actions CI |
+| 0021 | Domain | Everything under `ourbnb.gr`, back-office at `/admin/`, one Caddy in front of the site and KosPM |
 
 ---
 
@@ -293,6 +294,19 @@ shows everything.
 - [ ] `deploy/docker-compose.prod.yml`: postgres (volume), backend (gunicorn), scheduler
       (supercronic with `deploy/crontab`), Caddy reverse proxy with automatic HTTPS. Isolated network
       and ports so the existing app on the VPS is not affected.
+- [ ] One domain (ADR 0021): `deploy/Caddyfile` with the routes of the ADR on `ourbnb.gr`, `www`
+      redirecting to it, `X-Robots-Tag: noindex` on private paths, a Content-Security-Policy on the
+      whole domain, and no signed-link tokens in access logs. First check who holds ports 80/443 on
+      the VPS (ADR 0010).
+- [ ] Move the public site to the VPS (ADR 0021): an exported copy without `.git`, `.htaccess`,
+      `README.md` and PHP; Caddy takes over the redirects, headers, cache rules and 404 page; choose
+      how site releases reach the VPS; the form becomes a Django endpoint with the checks of
+      `api/lead.php` and a rate limit.
+- [ ] Protect `/admin/`: throttle the Django admin login (only the portal's logins are throttled
+      today); decide on two-factor login with Petros.
+- [ ] DNS switch, written in the runbook (ADR 0021): lower the TTL, test with `curl --resolve`, change
+      the apex A and AAAA and `www` together, leave the mail records alone, keep the old copy until
+      verified, and disconnect Hostinger's "Deploy from GitHub" afterwards.
 - [ ] `deploy/backup.sh`: nightly `pg_dump`, encrypted, uploaded off-site (S3-compatible, e.g.
       Backblaze B2); keep 30 daily / 12 monthly; documented restore test.
 - [ ] Owners' uploads (photos, contracts; from the Phase 2b review): the admin opens them through
@@ -378,6 +392,8 @@ payment; stay spanning two months belongs to the check-out month; owner with 3 p
 - [ ] Public API: count of managed properties, owners with `show_on_website=True` (name/logo),
       testimonials (admin-managed).
 - [ ] SEO basics: metadata, sitemap, Open Graph, local business schema for Kos.
+- A static site has been live at `ourbnb.gr` since 2026-10-29. This phase starts from it, and whatever
+  it builds must fit the routes of ADR 0021.
 
 ---
 
