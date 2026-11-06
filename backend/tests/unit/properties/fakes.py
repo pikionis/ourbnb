@@ -7,19 +7,26 @@ by the integration tests against PostgreSQL.
 
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 from kospm.properties.domain.errors import OwnerNotFound, PropertyNotFound
+from kospm.properties.domain.lead import OwnerLead
 from kospm.properties.domain.listing import ListingDraft, ListingText
 from kospm.properties.domain.owner import Owner
 from kospm.properties.domain.property import Property
 from kospm.properties.domain.value_objects import AccountHolderName, Afm, Email, Iban, PropertyCode
-from kospm.properties.service_layer.ports import BankAccountVerifier, ListingTextExtractor
+from kospm.properties.service_layer.ports import (
+    BankAccountVerifier,
+    LeadMailer,
+    ListingTextExtractor,
+)
 from kospm.properties.service_layer.unit_of_work import (
     OwnerRepository,
     PropertiesUnitOfWork,
     PropertyRepository,
 )
+from kospm.shared.outbox.domain import OutboxChannel, OutboxMessage
 from kospm.shared.outbox.service_layer.ports import AbstractOutbox
 from tests.fakes import FakeUnitOfWorkBase
 
@@ -126,6 +133,22 @@ class FakeBankAccountVerifier(BankAccountVerifier):
         outbox: AbstractOutbox,
     ) -> None:
         self.transfers.append(RequestedTransfer(owner_id, iban, holder_name, code))
+
+
+class FakeLeadMailer(LeadMailer):
+    """Records what it was asked to write, and writes a message anyone can recognise."""
+
+    def __init__(self) -> None:
+        self.seen: list[tuple[OwnerLead, datetime]] = []
+
+    def new_lead(self, lead: OwnerLead, received_at: datetime) -> OutboxMessage:
+        self.seen.append((lead, received_at))
+        return OutboxMessage(
+            channel=OutboxChannel.EMAIL,
+            recipient="ike@example.com",
+            template="properties.owner_lead",
+            payload={"subject": lead.name, "body": lead.phone},
+        )
 
 
 class FakeListingExtractor(ListingTextExtractor):

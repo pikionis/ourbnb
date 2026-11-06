@@ -9,6 +9,7 @@ from collections.abc import Callable
 from typing import Any
 
 from django import forms
+from django.contrib.admin.forms import AdminAuthenticationForm
 from django.contrib.auth import get_user_model, password_validation
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
@@ -140,3 +141,24 @@ class OwnerLoginForm(AuthenticationForm):
         if email and password and is_unconfirmed_login(email, password):
             return ValidationError(self.error_messages["unconfirmed"], code="unconfirmed")
         return super().get_invalid_login_error()
+
+
+class AdminLoginForm(AdminAuthenticationForm):
+    """The Django admin's login, throttled per username and per visitor: `/admin/` is the first
+    address bots try (ADR 0021). It says the same words as the portal when it refuses."""
+
+    # Django's API: the form reads this class attribute (never mutated).
+    error_messages = {  # noqa: RUF012
+        **AdminAuthenticationForm.error_messages,
+        "throttled": THROTTLED,
+    }
+
+    def clean(self) -> dict[str, Any]:
+        username = str(self.cleaned_data.get("username") or "").strip().lower()
+        throttle = portal_throttle("admin-login")
+        keys = (f"ip:{client_ip(self.request)}", f"username:{username}") if self.request else ()
+        if username and keys and not throttle.hit(*keys):
+            raise ValidationError(self.error_messages["throttled"], code="throttled")
+        data = super().clean()
+        throttle.reset(f"username:{username}")
+        return data

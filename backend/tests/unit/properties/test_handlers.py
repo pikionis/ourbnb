@@ -46,6 +46,7 @@ from kospm.properties.domain.errors import (
     WrongVerificationCode,
 )
 from kospm.properties.domain.events import OwnerEmailChanged
+from kospm.properties.domain.lead import LeadFormOptions
 from kospm.properties.domain.owner import BankAccountStatus
 from kospm.properties.domain.property import PropertyStatus
 from kospm.properties.domain.value_objects import (
@@ -68,6 +69,7 @@ from tests.unit.properties.builders import (
 )
 from tests.unit.properties.fakes import (
     FakeBankAccountVerifier,
+    FakeLeadMailer,
     FakePropertiesUnitOfWork,
     RequestedTransfer,
 )
@@ -98,6 +100,8 @@ class Harness:
                         "property_codes": PropertyCodeSeries(),
                         "bank_verification": BankVerificationPolicy(max_attempts=3),
                         "bank_account_verifier": self.verifier,
+                        "lead_mailer": FakeLeadMailer(),
+                        "lead_form": LeadFormOptions(areas=("Ψαλίδι",), bedrooms=("1",)),
                     },
                 )
             ],

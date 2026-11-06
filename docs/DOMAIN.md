@@ -64,6 +64,7 @@ tax declarations and the owner portal.
 | Δήλωση βραχυχρόνιας διαμονής | `StayDeclaration` | AADE declaration per stay |
 | Τέλος κλιματικής ανθεκτικότητας | `ClimateResilienceFee` | Per-night tax charged to guest, passed through to the state |
 | Τοπικός οδηγός | `LocalGuideEntry` | A recommendation (beach, restaurant, transfer…) |
+| Αίτημα εκτίμησης | `OwnerLead` | Someone with a home asks for an estimate on the public site's form |
 
 ---
 
@@ -637,6 +638,10 @@ Built as read models (queries), never touching aggregates directly.
 
 Next.js site for owners looking for management. Dynamic content via public API: number of managed
 properties, owners with `show_on_website = True` (name/logo), testimonials, managed in Django admin.
+
+**The form.** An `OwnerLead` needs a name and a phone number we can call; what the form does not offer
+counts as not stated. It is not an `Owner`: nothing is registered, and the IKE gets an email and calls
+back. Bots hear "ok" and send nothing, and one visitor's requests are limited (ADR 0021).
 
 ---
 

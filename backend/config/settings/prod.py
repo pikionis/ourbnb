@@ -1,4 +1,6 @@
-"""Production (VPS behind Caddy, ADR 0010). Everything secret or host-specific is required from env.
+"""Production and staging (VPS, behind nginx and Caddy: ADR 0010, 0022).
+
+Everything secret or host-specific is required from env.
 
 Minimal hardening for now; Phase 7 completes it. `manage.py check --deploy` currently reports
 only W005/W021 (HSTS subdomains/preload) and W008 (HTTPS redirect, which Caddy performs).
@@ -21,10 +23,22 @@ PORTAL_BASE_URL = env.str("PORTAL_BASE_URL")
 # Emails leave through SMTP; the provider is chosen with the deploy (Phase 7). Format, e.g.
 # smtp+tls://USER:PASSWORD@HOST:587 (django-environ's email_url).
 vars().update(env.email_url("EMAIL_URL"))
-# Caddy appends the visitor's address to X-Forwarded-For (ADR 0010); throttling reads it.
+# Who gets the requests for an estimate from the public site (ADR 0021).
+LEAD_NOTIFY_EMAIL = env.str("LEAD_NOTIFY_EMAIL")
+# Caddy puts the visitor's address in X-Forwarded-For (ADR 0022); throttling reads it.
 PORTAL_CLIENT_IP_HEADER = "HTTP_X_FORWARDED_FOR"
+# Attempts are counted in the database, so all workers share one count (ADR 0017). The table comes
+# from `manage.py createcachetable`, which every deploy runs (deploy/remote_up.sh).
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "kospm_cache",
+        # The default of 300 rows would let made-up usernames push real counts out of the table.
+        "OPTIONS": {"MAX_ENTRIES": 100_000},
+    }
+}
 
-# Caddy terminates TLS and redirects HTTP to HTTPS; it tells Django the original scheme.
+# nginx terminates TLS and redirects HTTP to HTTPS; Caddy tells Django the scheme (ADR 0022).
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True

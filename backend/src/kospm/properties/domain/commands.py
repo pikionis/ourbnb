@@ -182,3 +182,14 @@ class AnnounceCalendarSettings(Command):
     that existed before the reservations context did."""
 
     property_id: UUID
+
+
+@dataclass(frozen=True, kw_only=True)
+class SubmitOwnerLead(Command):
+    """Someone with a home asks for an estimate on the public site (ADR 0021)."""
+
+    name: str
+    phone: str
+    area: str
+    bedrooms: str
+    online: str

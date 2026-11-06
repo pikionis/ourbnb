@@ -3,7 +3,8 @@
 Each handler runs one Unit of Work and changes one aggregate. Commands carry plain values; the
 handlers turn them into value objects before opening the unit, so a malformed ΑΦΜ or IBAN is
 refused before anything is loaded. Dependencies besides `uow` and `clock` are injected by
-bootstrap by name: `property_defaults`, `bank_verification` (policy) and `bank_account_verifier`.
+bootstrap by name: `property_defaults`, `bank_verification` and `lead_form` (policies),
+`bank_account_verifier` and `lead_mailer`.
 
 Commands sent from a form carry the `expected_version` the form was rendered with: if someone
 else saved the aggregate since, the handler refuses with ConcurrencyError (ADR 0016), instead of
@@ -32,6 +33,7 @@ from kospm.properties.domain.commands import (
     RegisterOwner,
     SignContract,
     StartBankAccountVerification,
+    SubmitOwnerLead,
     UpdateOwnerDetails,
     UpdatePropertyProfile,
 )
@@ -45,6 +47,7 @@ from kospm.properties.domain.errors import (
     WrongVerificationCode,
 )
 from kospm.properties.domain.events import PropertyActivated
+from kospm.properties.domain.lead import LeadFormOptions, OwnerLead
 from kospm.properties.domain.owner import Owner, PayeeCheck, PayeeCheckResult
 from kospm.properties.domain.property import Property
 from kospm.properties.domain.value_objects import (
@@ -61,7 +64,7 @@ from kospm.properties.domain.value_objects import (
     IcalFeed,
     PropertyCode,
 )
-from kospm.properties.service_layer.ports import BankAccountVerifier
+from kospm.properties.service_layer.ports import BankAccountVerifier, LeadMailer
 from kospm.properties.service_layer.unit_of_work import PropertiesUnitOfWork
 from kospm.shared.clock import Clock
 from kospm.shared.domain import Command, DomainEvent, Money
@@ -408,6 +411,31 @@ def announce_calendar_settings(cmd: AnnounceCalendarSettings, uow: PropertiesUni
         uow.commit()
 
 
+# --- the public site (ADR 0021) -------------------------------------------------------------------
+
+
+def submit_owner_lead(
+    cmd: SubmitOwnerLead,
+    uow: PropertiesUnitOfWork,
+    clock: Clock,
+    lead_mailer: LeadMailer,
+    lead_form: LeadFormOptions,
+) -> None:
+    """Mail the IKE that someone asks for an estimate. No aggregate changes: the unit only makes
+    sure the message is stored before the visitor hears that we have it (ADR 0005)."""
+    lead = OwnerLead.from_form(
+        name=cmd.name,
+        phone=cmd.phone,
+        area=cmd.area,
+        bedrooms=cmd.bedrooms,
+        online=cmd.online,
+        options=lead_form,
+    )
+    with uow:
+        uow.outbox.enqueue(lead_mailer.new_lead(lead, clock.now()))
+        uow.commit()
+
+
 # --- events --------------------------------------------------------------------------------------
 
 
@@ -481,6 +509,7 @@ COMMAND_HANDLERS: dict[type[Command], Callable[..., None]] = {
     DeactivateProperty: deactivate_property,
     OffboardProperty: offboard_property,
     AnnounceCalendarSettings: announce_calendar_settings,
+    SubmitOwnerLead: submit_owner_lead,
 }
 
 EVENT_HANDLERS: dict[type[DomainEvent], list[Callable[..., None]]] = {

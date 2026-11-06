@@ -81,6 +81,7 @@ def _import_fresh(module: str, monkeypatch: pytest.MonkeyPatch) -> ModuleType:
 _PROD_REQUIRED = {
     "PORTAL_BASE_URL": "https://kospm.example",
     "EMAIL_URL": "smtp+tls://mailer:not-a-password@smtp.example:587",
+    "LEAD_NOTIFY_EMAIL": "ike@kospm.example",
 }
 
 
@@ -109,6 +110,24 @@ def test_prod_sends_email_by_smtp_and_reads_the_visitor_address_behind_caddy(
     assert (prod.EMAIL_HOST, prod.EMAIL_PORT, prod.EMAIL_USE_TLS) == ("smtp.example", 587, True)
     assert prod.PORTAL_BASE_URL == "https://kospm.example"
     assert prod.PORTAL_CLIENT_IP_HEADER == "HTTP_X_FORWARDED_FOR"
+
+
+def test_staging_can_print_its_emails_instead_of_sending_them(
+    secrets_env: pytest.MonkeyPatch,
+) -> None:
+    secrets_env.setenv("EMAIL_URL", "consolemail://")
+    prod = _import_fresh("config.settings.prod", secrets_env)
+    assert prod.EMAIL_BACKEND == "django.core.mail.backends.console.EmailBackend"
+
+
+def test_prod_counts_attempts_in_the_database_so_that_all_workers_share_them(
+    secrets_env: pytest.MonkeyPatch,
+) -> None:
+    prod = _import_fresh("config.settings.prod", secrets_env)
+    assert prod.CACHES["default"]["BACKEND"] == "django.core.cache.backends.db.DatabaseCache"
+    # The default of 300 rows would let made-up usernames push real counts out of the table.
+    assert prod.CACHES["default"]["OPTIONS"]["MAX_ENTRIES"] >= 100_000
+    assert prod.LEAD_NOTIFY_EMAIL == "ike@kospm.example"
 
 
 @pytest.mark.parametrize("module", ["config.settings.dev", "config.settings.prod"])

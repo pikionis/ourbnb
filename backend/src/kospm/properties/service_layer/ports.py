@@ -1,10 +1,13 @@
 """Ports of the properties context besides the repositories (hexagonal architecture)."""
 
 import abc
+from datetime import datetime
 from uuid import UUID
 
+from kospm.properties.domain.lead import OwnerLead
 from kospm.properties.domain.listing import ListingDraft, ListingText
 from kospm.properties.domain.value_objects import AccountHolderName, Iban
+from kospm.shared.outbox.domain import OutboxMessage
 from kospm.shared.outbox.service_layer.ports import AbstractOutbox
 
 
@@ -15,6 +18,14 @@ class ListingTextExtractor(abc.ABC):
     @abc.abstractmethod
     def extract(self, listing: ListingText) -> ListingDraft:
         """The draft read from `listing`; raises ListingNotRead when it cannot."""
+
+
+class LeadMailer(abc.ABC):
+    """Turns a lead from the public site into the message that tells the IKE (ADR 0021)."""
+
+    @abc.abstractmethod
+    def new_lead(self, lead: OwnerLead, received_at: datetime) -> OutboxMessage:
+        """The message to enqueue; the handler decides when."""
 
 
 class BankAccountVerifier(abc.ABC):

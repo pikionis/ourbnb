@@ -132,6 +132,27 @@ PORTAL_CLIENT_IP_HEADER = ""
 # Largest file an owner may upload (photos, the signed contract), in megabytes.
 PORTAL_UPLOAD_MAX_MB = 15
 
+# --- The public site's form (ADR 0021): the requests for an estimate that reach the IKE ---------
+
+# Who gets them by email. Production requires it (config.settings.prod).
+LEAD_NOTIFY_EMAIL = env.str("LEAD_NOTIFY_EMAIL", default="leads@localhost")
+# What the form offers, as the site's page writes it. Anything else counts as not stated.
+OWNER_LEAD_AREAS = (
+    "Κως (πόλη)",
+    "Ψαλίδι",
+    "Λάμπη",
+    "Τιγκάκι",
+    "Μαρμάρι",
+    "Μαστιχάρι",
+    "Καρδάμαινα",
+    "Κέφαλος",
+    "Ζηπάρι",
+    "Αντιμάχεια",
+    "Πυλί",
+    "Άλλη περιοχή",
+)
+OWNER_LEAD_BEDROOMS = ("1", "2", "3", "4", "5+")
+
 # --- Listing text read by the Claude API (DOMAIN §5 owner portal; design brief J6) ------------
 
 # Without a key the owner fills in the profile by hand (the default in development and tests).

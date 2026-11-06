@@ -44,6 +44,7 @@ from kospm.identity.service_layer import handlers as identity_handlers
 from kospm.identity.service_layer.ports import AccountTokens
 from kospm.identity.service_layer.unit_of_work import IdentityUnitOfWork
 from kospm.properties.adapters.bank_verification import ManualBankAccountVerifier
+from kospm.properties.adapters.lead_mailer import DjangoLeadMailer
 from kospm.properties.adapters.listing_extractor import (
     ClaudeListingExtractor,
     UnavailableListingExtractor,
@@ -56,6 +57,7 @@ from kospm.properties.domain.events import (
     OwnerRegistered,
     PropertyCalendarSettingsChanged,
 )
+from kospm.properties.domain.lead import LeadFormOptions
 from kospm.properties.domain.listing import ListingTextPolicy
 from kospm.properties.service_layer import handlers as properties_handlers
 from kospm.properties.service_layer.ports import ListingTextExtractor
@@ -254,7 +256,19 @@ def properties_dependencies() -> dict[str, object]:
         "bank_verification": _bank_verification_policy(),
         # The admin sends the test transfer by hand until a provider is chosen (Phase 2b).
         "bank_account_verifier": ManualBankAccountVerifier(),
+        "lead_mailer": DjangoLeadMailer(recipient=settings.LEAD_NOTIFY_EMAIL),
+        "lead_form": lead_form_options(),
     }
+
+
+def lead_form_options() -> LeadFormOptions:
+    """What the public site's form offers (OWNER_LEAD_*)."""
+    try:
+        return LeadFormOptions(
+            areas=tuple(settings.OWNER_LEAD_AREAS), bedrooms=tuple(settings.OWNER_LEAD_BEDROOMS)
+        )
+    except (TypeError, ValueError) as error:
+        raise ImproperlyConfigured(f"invalid OWNER_LEAD_*: {error}") from error
 
 
 def property_defaults() -> PropertyDefaults:

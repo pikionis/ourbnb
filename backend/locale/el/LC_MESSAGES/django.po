@@ -1297,3 +1297,51 @@ msgstr "Η ένταξή σας"
 
 msgid "Your properties"
 msgstr "Τα ακίνητά σας"
+
+msgid "A new request for an estimate from the website"
+msgstr "Νέο αίτημα εκτίμησης από το ourbnb.gr"
+
+msgid "Already on Booking.com or Airbnb: %(value)s"
+msgstr "Ήδη σε Booking.com ή Airbnb: %(value)s"
+
+msgid "Area: %(value)s"
+msgstr "Περιοχή: %(value)s"
+
+msgid "Bedrooms: %(value)s"
+msgstr "Υπνοδωμάτια: %(value)s"
+
+msgid "Date: %(value)s"
+msgstr "Ημερομηνία: %(value)s"
+
+msgid "Enter your name and a correct phone number."
+msgstr "Συμπλήρωσε όνομα και ένα σωστό τηλέφωνο."
+
+msgid "Invalid request."
+msgstr "Μη έγκυρο αίτημα."
+
+msgid "Name: %(value)s"
+msgstr "Όνομα: %(value)s"
+
+msgid "New estimate request: %(area)s"
+msgstr "Νέο αίτημα εκτίμησης: %(area)s"
+
+msgid "Not stated"
+msgstr "Δεν δηλώθηκε"
+
+msgid "Not yet"
+msgstr "Όχι ακόμα"
+
+msgid "Phone: %(value)s"
+msgstr "Τηλέφωνο: %(value)s"
+
+msgid "Thank you! We will call you soon."
+msgstr "Ευχαριστούμε! Θα σε πάρουμε τηλέφωνο σύντομα."
+
+msgid "Too many requests. Please call us."
+msgstr "Πάρα πολλά αιτήματα. Πάρε μας τηλέφωνο."
+
+msgid "Yes, on both"
+msgstr "Ναι, και στα δύο"
+
+msgid "Yes, on one"
+msgstr "Ναι, σε ένα"

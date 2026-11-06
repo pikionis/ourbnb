@@ -14,10 +14,13 @@ from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse
 from django.utils.translation import gettext_lazy as _
 
+from kospm.identity.entrypoints.forms import AdminLoginForm
 from kospm.identity.models import User
 
 if TYPE_CHECKING:
     from django.contrib.admin.options import _FieldsetSpec
+
+admin.site.login_form = AdminLoginForm
 
 OWNER_ACCOUNT_FIELDS = (
     "email",
