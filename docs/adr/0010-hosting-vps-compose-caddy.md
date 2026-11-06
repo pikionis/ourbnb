@@ -1,6 +1,7 @@
 # 0010 — Hosting: existing Hostinger VPS, Docker Compose, Caddy
 
-- Status: accepted; amended by 0021 (Caddy also serves the public site, all under ourbnb.gr)
+- Status: accepted; amended by 0021 (Caddy also serves the public site, all under ourbnb.gr) and
+  0022 (Caddy sits behind the host's nginx, which holds ports 80/443)
 - Date: 2026-10-22
 
 ## Context

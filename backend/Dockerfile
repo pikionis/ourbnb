@@ -3,8 +3,7 @@
 # KosPM backend -- DEVELOPMENT image, used by the repo-root docker-compose.yml.
 # It includes the dev dependency group (pytest, ruff, mypy, ...) and runs
 # Django's runserver with hot reload over a bind mount of ./backend.
-# The production image (gunicorn, non-root user, collectstatic, no dev deps)
-# comes in Phase 7 together with deploy/docker-compose.prod.yml.
+# The production image (gunicorn, non-root user, no dev deps) is Dockerfile.prod.
 #
 # After changing dependencies (pyproject.toml / uv.lock): docker compose build
 

@@ -5,7 +5,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # KosPM lives on this branch: main is the public site, which Hostinger deploys (ADR 0022).
+    branches: [kospm]
   pull_request:
 
 concurrency:
@@ -61,3 +62,25 @@ jobs:
 
       - name: make check
         run: make check
+
+  stack:
+    name: production stack
+    runs-on: ubuntu-24.04 # the VPS's Ubuntu
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The public site, read only: the stack serves it (ADR 0021).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          path: site-source
+          persist-credentials: false
+
+      - name: shell scripts
+        run: shellcheck --severity=warning deploy/*.sh deploy/tests/*.sh
+
+      - name: the stack, end to end
+        run: bash deploy/tests/smoke.sh site-source

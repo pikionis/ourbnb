@@ -1,0 +1,15 @@
+# The scheduled jobs of KosPM (ADR 0004), run by supercronic in the scheduler container.
+# Times are Athens wall clock (TZ in docker-compose.prod.yml). Supercronic never starts a job while
+# its previous run is still going.
+
+# Deliver what the handlers queued: emails, later WhatsApp (ADR 0005).
+* * * * * python manage.py process_outbox
+
+# Read the calendar feeds every 30 minutes (DOMAIN §6).
+*/30 * * * * python manage.py sync_calendars
+
+# Stays that ended today (DOMAIN §6).
+0 12 * * * python manage.py emit_stay_ended
+
+# Tell the reservations context about every property again: a safety net, once a day.
+15 4 * * * python manage.py announce_calendar_settings

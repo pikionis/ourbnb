@@ -25,6 +25,8 @@ dependencies = [
     # HTTP client of the iCal fetcher (timeout, ETag). Already installed with the Claude SDK;
     # declared because the fetcher uses it directly (Phase 3, approved by Petros).
     "httpx2>=2.16,<3",
+    # The production web server (ADR 0010, 0022): gthread workers behind Caddy.
+    "gunicorn>=26.2,<27",
 ]
 
 [dependency-groups]

@@ -72,6 +72,7 @@ kospm/
 | 0012 | Data sources | iCal + manual entry + CSV uploads only. No scraping, no stored third-party passwords |
 | 0013 | Tooling | uv, ruff, mypy, pytest, import-linter, GitHub Actions CI |
 | 0021 | Domain | Everything under `ourbnb.gr`, back-office at `/admin/`, one Caddy in front of the site and KosPM |
+| 0022 | Deploy | Behind the host's nginx on the shared VPS, staging beside production, shipped from a laptop |
 
 ---
 
@@ -291,35 +292,50 @@ shows everything.
 (same message id twice → one event); outbox chooses template vs free text by window.
 
 ## Phase 7 — Deploy v1 to the VPS
+Brought forward by Petros on 2026-11-06, ahead of Phases 4–6, so that the site and the back-office
+can be checked live on staging with real calendars (ADR 0022).
+
+Written on 2026-11-06, and to be ticked when CI's stack job first passes (they have never run):
 - [ ] `deploy/docker-compose.prod.yml`: postgres (volume), backend (gunicorn), scheduler
-      (supercronic with `deploy/crontab`), Caddy reverse proxy with automatic HTTPS. Isolated network
-      and ports so the existing app on the VPS is not affected.
-- [ ] One domain (ADR 0021): `deploy/Caddyfile` with the routes of the ADR on `ourbnb.gr`, `www`
-      redirecting to it, `X-Robots-Tag: noindex` on private paths, a Content-Security-Policy on the
-      whole domain, and no signed-link tokens in access logs. First check who holds ports 80/443 on
-      the VPS (ADR 0010).
-- [ ] Move the public site to the VPS (ADR 0021): an exported copy without `.git`, `.htaccess`,
-      `README.md` and PHP; Caddy takes over the redirects, headers, cache rules and 404 page; choose
-      how site releases reach the VPS; the form becomes a Django endpoint with the checks of
-      `api/lead.php` and a rate limit.
-- [ ] Protect `/admin/`: throttle the Django admin login (only the portal's logins are throttled
-      today); decide on two-factor login with Petros.
-- [ ] DNS switch, written in the runbook (ADR 0021): lower the TTL, test with `curl --resolve`, change
-      the apex A and AAAA and `www` together, leave the mail records alone, keep the old copy until
-      verified, and disconnect Hostinger's "Deploy from GitHub" afterwards.
+      (supercronic with `deploy/crontab`), Caddy behind the host's nginx (ADR 0022). Isolated network,
+      nothing published but Caddy's localhost port, resource limits.
+- [ ] `backend/Dockerfile.prod`, `deploy/ship.sh`, `deploy/remote_up.sh`, `deploy/setup_host.sh` and
+      `deploy/survey.sh`, with the guards this host needs (ADR 0022).
+- [ ] Staging at `staging.ourbnb.gr`, with its own database and secrets, sending nothing to anyone.
+- [ ] CI runs the whole stack end to end (`deploy/tests/smoke.sh`).
+- [ ] One domain (ADR 0021): `deploy/Caddyfile` with the routes of the ADR, `www` redirecting to the
+      apex (nginx), `X-Robots-Tag: noindex` on private paths, a Content-Security-Policy on the whole
+      domain, and no access logs (signed-link tokens). Ports 80/443 checked: nginx holds them.
+- [ ] The public site on the VPS (ADR 0021): an exported copy without `.git`, `.htaccess`, `README.md`
+      and PHP; Caddy takes over the headers, cache rules and 404 page; `ship.sh` sends site releases.
+
+Done and tested:
+- [x] The form is a Django endpoint at the same address, with the checks of `api/lead.php` and a limit.
+- [x] Throttle the Django admin login, with counts that hold on the database cache.
+- [x] The DNS switch, written in the runbook (ADR 0021).
+
+To do:
+- [ ] Decide on two-factor login with Petros.
+- [ ] Sent `properties.owner_lead` rows purged from the outbox, and the site's privacy page checked
+      with Petros (ADR 0022). A decision on a cap for the whole form.
+- [ ] **Done on the server:** staging is up, checked by Petros with real iCal feeds.
+- [ ] **Done on the server:** production is up and `ourbnb.gr` is switched.
 - [ ] `deploy/backup.sh`: nightly `pg_dump`, encrypted, uploaded off-site (S3-compatible, e.g.
       Backblaze B2); keep 30 daily / 12 monthly; documented restore test.
 - [ ] Owners' uploads (photos, contracts; from the Phase 2b review): the admin opens them through
       a staff-only view (media is never served publicly); they are backed up with the database,
       not only `pg_dump`; replaced files are deleted on a schedule (retention of replaced signed
       contracts decided with Petros).
-- [ ] Request limits: Caddy `request_body max_size` above `PORTAL_UPLOAD_MAX_MB`; the gunicorn
-      timeout longer than twice `LISTING_EXTRACTOR_TIMEOUT_SECONDS` (ADR 0019).
-- [ ] Health endpoint, structured logging, error reporting (Sentry free tier, optional). If Sentry
-      is used: scrub key-box codes, IBANs and pasted listing text, and send no local variables or
-      request bodies.
-- [ ] `docs/RUNBOOK.md`: deploy, rollback, restore, rotate secrets, add a property, add a team member.
-- [ ] Production smoke test: real iCal of one property, plan tomorrow, receive WhatsApp on test phone.
+- [ ] Request limits: Caddy `request_body max_size` and nginx `client_max_body_size` above
+      `PORTAL_UPLOAD_MAX_MB`; the gunicorn timeout longer than twice
+      `LISTING_EXTRACTOR_TIMEOUT_SECONDS` (ADR 0019). Written; never run.
+- [x] Health endpoint (`/healthz`).
+- [ ] Structured logging, error reporting (Sentry free tier, optional). If Sentry is used: scrub
+      key-box codes, IBANs and pasted listing text, and send no local variables or request bodies.
+- [x] `docs/RUNBOOK.md`: deploy, rollback, rotate secrets, the DNS switch.
+      [ ] Restore, add a property, add a team member.
+- [ ] Production smoke test: real iCal of one property, plan tomorrow, receive WhatsApp on test phone
+      (plan and WhatsApp once Phases 4–6 exist).
 
 ### v1 acceptance
 Admin onboards properties, calendars sync automatically, cleaners receive tomorrow's plan on WhatsApp

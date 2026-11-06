@@ -1,0 +1,109 @@
+# One entry point for the public site and KosPM, by path (ADR 0021).
+#
+# TLS ends at the host's nginx, which forwards here on a localhost port and sets X-Real-IP (ADR
+# 0022). Nothing outside the host can reach this port, so that header can be trusted. Staging and
+# production run this same file; they differ by KOSPM_ENV.
+{
+	admin off
+	auto_https off
+}
+
+# On every answer. No inline scripts and no third-party origins, on the site or in the back office:
+# a script on a public page would run with a logged-in staff member's session (ADR 0021).
+(always) {
+	header {
+		defer
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
+		-Server
+	}
+}
+
+:8080 {
+	# No access log, here or in nginx: the paths of signed links carry their tokens (ADR 0021).
+
+	# Above PORTAL_UPLOAD_MAX_MB; the same limit as the nginx vhost.
+	request_body {
+		max_size 64MB
+	}
+
+	encode zstd gzip
+
+	import always
+
+	# Search engines stay out of staging altogether.
+	@staging expression `"{$KOSPM_ENV}" == "staging"`
+	header @staging X-Robots-Tag "noindex, nofollow"
+
+	@stagingRobots {
+		expression `"{$KOSPM_ENV}" == "staging"`
+		path /robots.txt
+	}
+	handle @stagingRobots {
+		respond "User-agent: *
+Disallow: /
+" 200
+	}
+
+	# --- KosPM (the table in ADR 0021). Exact prefixes: /administrator belongs to the site. ---
+	@private path /admin /admin/* /owner /owner/* /c/* /s/*
+	header @private X-Robots-Tag "noindex, nofollow"
+
+	@django path /admin /admin/* /owner /owner/* /c/* /s/* /webhooks/* /api/* /i18n/* /healthz
+	handle @django {
+		reverse_proxy backend:8000 {
+			# One visitor address and the real scheme, from nginx (see above). Django's throttling
+			# and its secure-cookie and CSRF checks read these.
+			header_up X-Forwarded-For {http.request.header.X-Real-IP}
+			header_up X-Forwarded-Proto https
+		}
+	}
+
+	# Django's collected static files.
+	handle /static/* {
+		uri strip_prefix /static
+		root * /srv/static
+		header Cache-Control "public, max-age=3600"
+		file_server
+	}
+
+	# --- Everything else: the public site's files (what its .htaccess does on the web hosting). ---
+	handle {
+		root * /srv/site
+		header {
+			X-Content-Type-Options "nosniff"
+			Referrer-Policy "strict-origin-when-cross-origin"
+			X-Frame-Options "SAMEORIGIN"
+			Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		}
+		@pages path / *.html
+		@code path *.css *.js
+		@images path *.webp *.png *.jpg *.jpeg *.ico
+		@fonts path *.woff2
+		# A route keeps this order: the general rule first, then the ones that replace it.
+		route {
+			header Cache-Control "public, max-age=3600"
+			header @pages Cache-Control "no-cache"
+			header @code Cache-Control "public, max-age=604800"
+			header @images Cache-Control "public, max-age=2592000"
+			header @fonts Cache-Control "public, max-age=31536000"
+		}
+		file_server {
+			# The exported copy holds none of these (deploy/unpack_site.sh); this is the second lock.
+			hide .* *.php *.md
+		}
+	}
+
+	handle_errors {
+		import always
+		@notFound expression `{http.error.status_code} == 404`
+		handle @notFound {
+			root * /srv/site
+			rewrite * /404.html
+			header Cache-Control "no-cache"
+			file_server {
+				status 404
+			}
+		}
+		respond "{http.error.status_code} {http.error.status_text}"
+	}
+}

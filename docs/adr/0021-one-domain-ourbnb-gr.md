@@ -1,6 +1,7 @@
 # 0021 — One domain: the site and KosPM under ourbnb.gr (amends 0009 and 0010)
 
-- Status: accepted (Petros, 2026-11-05)
+- Status: accepted (Petros, 2026-11-05); amended by 0022 (the host's nginx terminates TLS in front
+  of Caddy, and does the HTTPS and `www` redirects)
 - Date: 2026-11-05
 
 ## Context
@@ -35,6 +36,7 @@ own releases, separate from KosPM's.
 | `/api/*` | The JSON API (ADR 0002) |
 | `/i18n/*` | The language toggle |
 | `/static/*` | Django's static files, served by Caddy |
+| `/healthz` | The health check of the deploy and the containers |
 | anything else | The public site's files, served by Caddy |
 
 Matches are exact, so `/administrator` belongs to the site and answers 404.

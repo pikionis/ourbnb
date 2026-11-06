@@ -1,0 +1,60 @@
+# syntax=docker/dockerfile:1
+#
+# KosPM backend: the PRODUCTION image, for staging and production (ADR 0010, 0022).
+# gunicorn, a non-root user, no dev dependencies, no tests. The scheduler runs the same image with
+# supercronic (ADR 0004). Built on the server by deploy/remote_up.sh, from the shipped commit.
+
+FROM python:3.12-slim AS build
+
+# uv, pinned to the same version as local development and CI.
+COPY --from=ghcr.io/astral-sh/uv:0.13.5 /uv /uvx /bin/
+
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_PYTHON=/usr/local/bin/python3.12 \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1
+
+WORKDIR /app
+
+# Third-party dependencies first: this layer changes only with pyproject.toml or uv.lock.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-dev --no-install-project
+
+COPY . .
+RUN rm -rf tests && uv sync --locked --no-dev
+
+
+FROM python:3.12-slim
+
+ENV PATH=/opt/venv/bin:$PATH \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    DJANGO_SETTINGS_MODULE=config.settings.prod \
+    MEDIA_ROOT=/data/media
+
+# The checksum is the one aptible publishes with this release.
+ADD https://github.com/aptible/supercronic/releases/download/v0.2.51/supercronic-linux-amd64 /usr/local/bin/supercronic
+RUN echo "1692066e350a88ff4d7d6474fe3c7a6c41ec5e89  /usr/local/bin/supercronic" | sha1sum -c - \
+    && chmod 0755 /usr/local/bin/supercronic
+
+COPY --from=build /opt/venv /opt/venv
+COPY --from=build /app /app
+
+# Named volumes take these owners on first use, so the non-root user can write to them.
+RUN useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin kospm \
+    && mkdir -p /data/media /app/staticfiles \
+    && chown -R kospm:kospm /data /app/staticfiles
+
+WORKDIR /app
+USER kospm
+EXPOSE 8000
+
+# Threads, because reading a listing waits on the Claude API. The timeout must be longer than twice
+# LISTING_EXTRACTOR_TIMEOUT_SECONDS (a failed call is retried once). No access log: the paths of
+# signed links carry their tokens (ADR 0021).
+CMD ["gunicorn", "config.wsgi:application", \
+     "--bind", "0.0.0.0:8000", \
+     "--worker-class", "gthread", "--workers", "3", "--threads", "4", \
+     "--timeout", "150", "--graceful-timeout", "30", \
+     "--worker-tmp-dir", "/dev/shm", "--no-control-socket"]

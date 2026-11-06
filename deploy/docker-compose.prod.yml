@@ -1,0 +1,124 @@
+# The KosPM stack of ONE environment, staging or production (ADR 0010, 0022).
+#
+# Always run it through deploy/dc.sh, which names the project and the environment's .env file. Each
+# environment has its own containers, database, volumes and secrets, and shares nothing with the
+# other one. Only Caddy publishes a port, on localhost only: the host's nginx is the way in, and
+# nothing here is reachable from outside.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-app: &app
+  image: kospm-backend:${KOSPM_ENV:?run through deploy/dc.sh}
+  restart: unless-stopped
+  env_file:
+    - ../../.env
+  depends_on:
+    postgres:
+      condition: service_healthy
+  networks:
+    - kospm
+  logging: *logging
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # $$ escapes Compose interpolation: the shell in the container expands these.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      - kospm
+    logging: *logging
+    # Resource limits protect the other applications on the VPS (ADR 0010).
+    mem_limit: 1g
+    cpus: 1.0
+
+  backend:
+    <<: *app
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.prod
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+    volumes:
+      - media:/data/media
+      - static:/app/staticfiles
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import os, urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/healthz', headers={'Host': os.environ['KOSPM_DOMAIN']}), timeout=5)"
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 20s
+    mem_limit: 1g
+    cpus: 2.0
+
+  scheduler:
+    <<: *app
+    command: ["supercronic", "/etc/kospm/crontab"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+      # The schedule is in Athens time; the commands themselves ask the Clock (ADR 0004).
+      TZ: Europe/Athens
+    volumes:
+      - ./crontab:/etc/kospm/crontab:ro
+      - media:/data/media
+    mem_limit: 512m
+    cpus: 1.0
+
+  caddy:
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      KOSPM_ENV: ${KOSPM_ENV:?}
+    ports:
+      - "127.0.0.1:${KOSPM_HTTP_PORT:?}:8080"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../../site:/srv/site:ro
+      - static:/srv/static:ro
+    networks:
+      - kospm
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # The image's caddy binary carries this file capability, and exec fails if the container's
+    # bounding set lacks it, although port 8080 does not need it.
+    cap_add:
+      - NET_BIND_SERVICE
+    mem_limit: 256m
+    cpus: 0.5
+
+volumes:
+  pgdata:
+  media:
+  static:
+
+networks:
+  kospm:

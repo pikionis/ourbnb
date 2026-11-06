@@ -1,6 +1,6 @@
 # Local development stack: PostgreSQL 16 + Django backend with hot reload.
 # See ADR 0003 (PostgreSQL 16) and ADR 0010 (Docker Compose hosting).
-# Production uses deploy/docker-compose.prod.yml (Phase 7), not this file.
+# Production uses deploy/docker-compose.prod.yml (ADR 0022), not this file.
 #
 #   make up     -> docker compose up
 #   make down   -> docker compose down
