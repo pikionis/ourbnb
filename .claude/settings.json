@@ -9,12 +9,21 @@
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push -u origin kospm)",
+      "Bash(git push origin kospm)"
     ],
     "deny": [
       "Read(./.env)",
       "Read(./deploy/.env)",
-      "Bash(git push:*)"
+      "Bash(git push *main*)",
+      "Bash(git push *:*)",
+      "Bash(git push *+*)",
+      "Bash(git push *--force*)",
+      "Bash(git push *-f*)",
+      "Bash(git push *--mirror*)",
+      "Bash(git push *--all*)",
+      "Bash(git push *--delete*)"
     ]
   }
 }
