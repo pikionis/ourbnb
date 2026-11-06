@@ -295,7 +295,8 @@ shows everything.
 Brought forward by Petros on 2026-11-06, ahead of Phases 4–6, so that the site and the back-office
 can be checked live on staging with real calendars (ADR 0022).
 
-Proven by CI's stack job on 2026-11-06 (46 checks, behind a real nginx), not yet run on the server:
+Proven by CI's stack job on 2026-11-06 (46 checks, behind a real nginx), and running as staging on the
+VPS since the same day (production has not run yet):
 - [x] `deploy/docker-compose.prod.yml`: postgres (volume), backend (gunicorn), scheduler
       (supercronic with `deploy/crontab`), Caddy behind the host's nginx (ADR 0022). Isolated network,
       nothing published but Caddy's localhost port, resource limits.

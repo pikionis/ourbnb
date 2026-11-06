@@ -27,6 +27,10 @@ change nothing.
    ```
 4. **Setup, laptop** (go-ahead): the same command without `--dry-run`. It installs Docker if needed,
    creates the folders and a `.env` with fresh secrets, and sets up the vhost and its certificate.
+   Expected in its output: `cloudpanel`'s postinst failing on a missing `/tmp/cloudpanel` file.
+   It ends with FeedGenix's own check, whose baseline also flags system package upgrades. Before
+   blaming a setup for a `FAIL`, compare the file's `stat -c %z` and its md5 with `dpkg-query -W
+   -f='${Conffiles}\n' <package>`. Rebaselining that check is the owner's call, never this script's.
 5. **First deploy, laptop:** `deploy/ship.sh staging`
 6. **Your admin user** (you type the password; it is stored only as a hash):
    ```bash
