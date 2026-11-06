@@ -99,6 +99,16 @@ copy stays until step 8.
 
 After the switch, site changes reach the visitors with `deploy/ship.sh production`.
 
+## Removing an environment
+This deletes that environment's database and uploads. The other applications are not touched.
+```bash
+cd /srv/kospm/staging/app/deploy && bash dc.sh staging down --volumes
+rm /etc/nginx/sites-enabled/kospm-staging.conf /etc/nginx/sites-available/kospm-staging.conf
+nginx -t && systemctl reload nginx
+certbot delete --cert-name staging.ourbnb.gr
+cd / && rm -r /srv/kospm/staging
+```
+
 ## Never
 - Push or merge `kospm` into `main`: that is the live site until the switch.
 - Run `apt` on this host without reading FeedGenix's notes (`feedgenix/ops/README.md`).

@@ -295,18 +295,18 @@ shows everything.
 Brought forward by Petros on 2026-11-06, ahead of Phases 4–6, so that the site and the back-office
 can be checked live on staging with real calendars (ADR 0022).
 
-Written on 2026-11-06, and to be ticked when CI's stack job first passes (they have never run):
-- [ ] `deploy/docker-compose.prod.yml`: postgres (volume), backend (gunicorn), scheduler
+Proven by CI's stack job on 2026-11-06 (46 checks, behind a real nginx), not yet run on the server:
+- [x] `deploy/docker-compose.prod.yml`: postgres (volume), backend (gunicorn), scheduler
       (supercronic with `deploy/crontab`), Caddy behind the host's nginx (ADR 0022). Isolated network,
       nothing published but Caddy's localhost port, resource limits.
-- [ ] `backend/Dockerfile.prod`, `deploy/ship.sh`, `deploy/remote_up.sh`, `deploy/setup_host.sh` and
+- [x] `backend/Dockerfile.prod`, `deploy/ship.sh`, `deploy/remote_up.sh`, `deploy/setup_host.sh` and
       `deploy/survey.sh`, with the guards this host needs (ADR 0022).
-- [ ] Staging at `staging.ourbnb.gr`, with its own database and secrets, sending nothing to anyone.
-- [ ] CI runs the whole stack end to end (`deploy/tests/smoke.sh`).
-- [ ] One domain (ADR 0021): `deploy/Caddyfile` with the routes of the ADR, `www` redirecting to the
+- [x] Staging at `staging.ourbnb.gr`, with its own database and secrets, sending nothing to anyone.
+- [x] CI runs the whole stack end to end (`deploy/tests/smoke.sh`).
+- [x] One domain (ADR 0021): `deploy/Caddyfile` with the routes of the ADR, `www` redirecting to the
       apex (nginx), `X-Robots-Tag: noindex` on private paths, a Content-Security-Policy on the whole
       domain, and no access logs (signed-link tokens). Ports 80/443 checked: nginx holds them.
-- [ ] The public site on the VPS (ADR 0021): an exported copy without `.git`, `.htaccess`, `README.md`
+- [x] The public site on the VPS (ADR 0021): an exported copy without `.git`, `.htaccess`, `README.md`
       and PHP; Caddy takes over the headers, cache rules and 404 page; `ship.sh` sends site releases.
 
 Done and tested:
@@ -326,9 +326,9 @@ To do:
       a staff-only view (media is never served publicly); they are backed up with the database,
       not only `pg_dump`; replaced files are deleted on a schedule (retention of replaced signed
       contracts decided with Petros).
-- [ ] Request limits: Caddy `request_body max_size` and nginx `client_max_body_size` above
+- [x] Request limits: Caddy `request_body max_size` and nginx `client_max_body_size` above
       `PORTAL_UPLOAD_MAX_MB`; the gunicorn timeout longer than twice
-      `LISTING_EXTRACTOR_TIMEOUT_SECONDS` (ADR 0019). Written; never run.
+      `LISTING_EXTRACTOR_TIMEOUT_SECONDS` (ADR 0019).
 - [x] Health endpoint (`/healthz`).
 - [ ] Structured logging, error reporting (Sentry free tier, optional). If Sentry is used: scrub
       key-box codes, IBANs and pasted listing text, and send no local variables or request bodies.
