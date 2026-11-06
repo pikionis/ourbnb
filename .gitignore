@@ -36,3 +36,6 @@ backups/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# The VPS survey (deploy/survey.sh): read locally, never committed.
+survey.txt
