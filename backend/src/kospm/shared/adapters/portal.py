@@ -14,28 +14,34 @@ from uuid import UUID
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
 from django.http.response import HttpResponseBase
-from django.shortcuts import resolve_url
+from django.shortcuts import render, resolve_url
 from django.views.decorators.cache import never_cache
 
 type View = Callable[..., HttpResponseBase]
 
 
 def owner_page(view: View) -> View:
-    """The view gets `(request, owner_id, ...)`. Anonymous visitors go to the login page; a
-    staff login is refused (403). Pages and files are never cached, so a shared phone's
-    browser keeps no IBAN or key-box photo after logout."""
+    """The view gets `(request, owner_id, ...)`. Anonymous visitors go to the login page. Any
+    other login is refused (403) with a page that says why: a member of staff is pointed to the
+    back office, and an account with no owner is asked to contact the company. Pages and files
+    are never cached, so a shared phone's browser keeps no IBAN or key-box photo after logout."""
 
     @functools.wraps(view)
     def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
         owner_id = current_owner_id(request)
         if owner_id is None:
-            raise PermissionDenied("the owner portal is for owners' logins")
+            return not_an_owner(request)
         return view(request, owner_id, *args, **kwargs)
 
     return login_required(never_cache(wrapper))
+
+
+def not_an_owner(request: HttpRequest) -> HttpResponse:
+    """The refusal of a login that is not an owner's, e.g. the admin's own login."""
+    refusal = "staff" if request.user.is_staff else "no-owner"
+    return render(request, "portal/not_owner.html", {"refusal": refusal}, status=403)
 
 
 def current_owner_id(request: HttpRequest) -> UUID | None:

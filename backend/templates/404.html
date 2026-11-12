@@ -1,0 +1,10 @@
+{% extends "portal/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Page not found" %}{% endblock %}
+{% block content %}
+  <section class="card">
+    <h1>{% translate "Page not found" %}</h1>
+    <p class="lead">{% translate "The address may be mistyped, or the page no longer exists." %}</p>
+    <p><a class="button" href="{{ portal_home }}">{% translate "Back to the start" %}</a></p>
+  </section>
+{% endblock %}

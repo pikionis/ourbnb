@@ -73,7 +73,31 @@ class TestAccess:
             assert "no-store" in client.get(url)["Cache-Control"]
 
     def test_a_staff_login_is_not_an_owner(self, admin_client: Client) -> None:
-        assert admin_client.get(DASHBOARD).status_code == 403
+        response = admin_client.get(DASHBOARD)
+        assert response.status_code == 403
+        assert "no-store" in response["Cache-Control"]
+
+    def test_a_staff_login_is_told_why_and_where_to_go(self, admin_client: Client) -> None:
+        page = admin_client.get(DASHBOARD).content.decode()
+        assert 'data-refusal="staff"' in page
+        assert f'href="{reverse("admin:index")}"' in page
+        assert reverse("identity:logout") in page
+
+    def test_a_login_with_no_owner_is_told_to_contact_us(self, client: Client) -> None:
+        user = User.objects.create_user(username="made-in-admin", password="x-Not-Used-9")
+        client.force_login(user)
+        response = client.get(DASHBOARD)
+        assert response.status_code == 403
+        page = response.content.decode()
+        assert 'data-refusal="no-owner"' in page
+        assert reverse("admin:index") not in page
+
+    def test_an_unknown_address_answers_with_a_page_of_the_portal(self, client: Client) -> None:
+        response = client.get("/owner/no-such-page/")
+        assert response.status_code == 404
+        page = response.content.decode()
+        assert "portal/portal.css" in page
+        assert f'href="{reverse("portal:dashboard")}"' in page
 
 
 class TestRegistration:

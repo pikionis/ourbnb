@@ -1345,3 +1345,33 @@ msgstr "Ναι, και στα δύο"
 
 msgid "Yes, on one"
 msgstr "Ναι, σε ένα"
+
+msgid "This page is for owners"
+msgstr "Η σελίδα είναι για ιδιοκτήτες"
+
+msgid "You are logged in with the company's account. The owner portal opens only with an owner's login."
+msgstr "Έχετε συνδεθεί με λογαριασμό της εταιρείας. Το portal ιδιοκτητών ανοίγει μόνο με σύνδεση ιδιοκτήτη."
+
+msgid "Go to the back office"
+msgstr "Μετάβαση στη διαχείριση"
+
+msgid "To see the portal as an owner sees it, open it in a private window, or log out first."
+msgstr "Για να δείτε το portal όπως το βλέπει ένας ιδιοκτήτης, ανοίξτε το σε ιδιωτικό παράθυρο ή αποσυνδεθείτε πρώτα."
+
+msgid "This login is not linked to an owner yet. Please contact us."
+msgstr "Αυτή η σύνδεση δεν αντιστοιχεί ακόμη σε ιδιοκτήτη. Επικοινωνήστε μαζί μας."
+
+msgid "Page not found"
+msgstr "Η σελίδα δεν βρέθηκε"
+
+msgid "The address may be mistyped, or the page no longer exists."
+msgstr "Η διεύθυνση μπορεί να είναι λάθος, ή η σελίδα να μην υπάρχει πια."
+
+msgid "Back to the start"
+msgstr "Επιστροφή στην αρχή"
+
+msgid "No access"
+msgstr "Χωρίς πρόσβαση"
+
+msgid "This page is not open to this login."
+msgstr "Αυτή η σελίδα δεν είναι διαθέσιμη σε αυτή τη σύνδεση."

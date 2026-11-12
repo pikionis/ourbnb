@@ -1,0 +1,10 @@
+{% extends "portal/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "No access" %}{% endblock %}
+{% block content %}
+  <section class="card">
+    <h1>{% translate "No access" %}</h1>
+    <p class="lead">{% translate "This page is not open to this login." %}</p>
+    <p><a class="button" href="{{ portal_home }}">{% translate "Back to the start" %}</a></p>
+  </section>
+{% endblock %}
