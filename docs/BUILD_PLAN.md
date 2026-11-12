@@ -314,6 +314,10 @@ Done and tested:
 - [x] The form is a Django endpoint at the same address, with the checks of `api/lead.php` and a limit.
 - [x] Throttle the Django admin login, with counts that hold on the database cache.
 - [x] The DNS switch, written in the runbook (ADR 0021).
+- [x] The back office's look: django-unfold with OurBnb's colours, Greek texts and a staging badge
+      (asked by Petros, 2026-11-12). `'unsafe-eval'` under `/admin` only (ADR 0021, amended).
+- [x] Refusals explain themselves: a staff login on the owner portal gets a 403 page that says
+      why, and the 403 and 404 pages have the portal's frame.
 
 To do:
 - [ ] Decide on two-factor login with Petros.

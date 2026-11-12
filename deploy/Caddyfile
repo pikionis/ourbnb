@@ -10,11 +10,23 @@
 
 # On every answer. No inline scripts and no third-party origins, on the site or in the back office:
 # a script on a public page would run with a logged-in staff member's session (ADR 0021).
+#
+# One exception, under /admin only (approved by Petros on 2026-11-12): the back office's theme,
+# django-unfold, runs Alpine.js, which builds its expressions with `new Function`, so the admin's
+# policy adds 'unsafe-eval'. Every other path keeps the strict policy. The two matchers never
+# overlap, so the order of the deferred headers does not matter.
 (always) {
 	header {
 		defer
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
 		-Server
+	}
+	header `!path('/admin', '/admin/*')` {
+		defer
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
+	}
+	header `path('/admin', '/admin/*')` {
+		defer
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
 	}
 }
 

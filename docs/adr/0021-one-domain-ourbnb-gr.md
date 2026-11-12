@@ -69,6 +69,10 @@ screen ships. If ADR 0020 is accepted, the new screens take `/admin/` and the Dj
   But a script on a public page runs on the same origin as the back-office, so it could act for a
   logged-in staff member. The public pages load no third-party script today, and adding one needs a
   review. Caddy sends a Content-Security-Policy on the whole domain.
+  - Amended 2026-11-12, approved by Petros: under `/admin` only, the policy also allows
+    `'unsafe-eval'`, because the back office's theme (django-unfold) runs Alpine.js. The site, the
+    owner portal and the signed links keep the strict policy, and the smoke test checks both.
+    The admin is reached only after a staff login, and Django escapes every value it shows.
 - **`/admin/` is the first address bots try.** Only the portal's logins are throttled today; Django's
   admin login is not. It gets throttling before go-live, and Phase 7 decides on two-factor login.
 - Private paths send `X-Robots-Tag: noindex`, and access logs do not record signed-link tokens.
