@@ -649,6 +649,15 @@ back. Bots hear "ok" and send nothing, and one visitor's requests are limited (A
 - Accountant: tax treatment IKE ↔ owner (sublease vs management fee).
 - Accountant: exact guest fields required in the AADE declaration; retention period.
 - Accountant: climate resilience fee rates per season / property type.
+- **ΤΑΚ in the owner portal (Petros, 2026-11-12), for Phases 10–12.** Petros wants the owner to see,
+  for the previous month, the nights booked and the fee they owe, e.g. 20 nights × 8 € in the summer
+  season, together with the RF payment code to pay it. This conflicts with §10 and §11 as written:
+  there the guest pays the fee on the platform, it passes through to the state, and the IKE
+  declares. Before building it, settle:
+  - who declares and pays the fee, the owner or the IKE;
+  - whether the fee the guests paid reaches the owner, e.g. in the payout;
+  - where the RF code comes from, and whether KosPM shows it or produces it;
+  - the rates per season and property type (above).
 - Consumables cost per cleaning (for margin reporting).
 - E-signature provider (gov.gr digital signature by the owner?) — with the lawyer.
 - ΑΜΑ under the sublease model: always a new ΑΜΑ in the IKE's name, or can an owner's existing ΑΜΑ
