@@ -12,6 +12,7 @@ import json
 from django.contrib import admin
 from django.http import HttpRequest
 from django.utils.translation import gettext_lazy as _
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 
 from kospm.shared.outbox.domain import OutboxChannel
 from kospm.shared.outbox.models import OutboxMessage
@@ -31,7 +32,7 @@ SHOWN_FIELDS = (
 
 
 @admin.register(OutboxMessage)
-class OutboxMessageAdmin(admin.ModelAdmin[OutboxMessage]):
+class OutboxMessageAdmin(UnfoldModelAdmin, admin.ModelAdmin[OutboxMessage]):
     list_display = (
         "status",
         "channel",

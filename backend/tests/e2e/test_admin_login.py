@@ -101,7 +101,7 @@ def test_login_page_is_in_greek_when_the_browser_asks_for_greek(client: Client) 
     assert response.status_code == 200
     assert response["Content-Language"] == "el"
     page = response.content.decode("utf-8")
-    assert "Διαχείριση Django" in page  # "Django administration"
+    assert "Καλώς ήρθατε στο" in page  # unfold's "Welcome back to", translated in our catalog
     assert "Σύνδεση" in page  # "Log in"
 
 
@@ -111,7 +111,7 @@ def test_login_page_is_in_english_when_the_browser_asks_for_english(client: Clie
     assert response.status_code == 200
     assert response["Content-Language"] == "en"
     page = response.content.decode("utf-8")
-    assert "Django administration" in page
+    assert "Welcome back to" in page
     assert "Log in" in page
 
 

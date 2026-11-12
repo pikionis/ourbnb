@@ -27,6 +27,9 @@ dependencies = [
     "httpx2>=2.16,<3",
     # The production web server (ADR 0010, 0022): gthread workers behind Caddy.
     "gunicorn>=26.2,<27",
+    # A modern look for the Django admin back office (ADR 0006): a theme, no rule moves. Tried
+    # on staging at Petros's request (2026-11-12). 0.x changes between minors, so pin one.
+    "django-unfold>=0.110.1,<0.111",
 ]
 
 [dependency-groups]
@@ -136,6 +139,24 @@ ignore_errors = true
 # degrading every env.str()/env.db() result to Any.
 module = ["environ", "environ.*"]
 follow_untyped_imports = true
+
+[[tool.mypy.overrides]]
+# django-unfold ships no py.typed marker, and its annotations disagree with django-stubs (its
+# save_model takes a plain Model): treat it as untyped. Our admin classes keep Django's typed
+# ModelAdmin[M] (or form) as a second base, so their own code is still checked against it.
+module = ["unfold", "unfold.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# The modules that subclass unfold's (untyped) admin classes and forms.
+module = [
+    "kospm.identity.entrypoints.admin",
+    "kospm.identity.entrypoints.forms",
+    "kospm.properties.entrypoints.admin",
+    "kospm.reservations.entrypoints.admin",
+    "kospm.shared.outbox.entrypoints.admin",
+]
+disallow_subclassing_any = false
 
 [[tool.mypy.overrides]]
 # Test bodies are still type-checked (check_untyped_defs), annotations are optional.

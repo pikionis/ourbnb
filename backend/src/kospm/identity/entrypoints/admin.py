@@ -9,10 +9,13 @@ owner's page (properties).
 from typing import TYPE_CHECKING, Any
 
 from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.admin import GroupAdmin, UserAdmin
+from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse
 from django.utils.translation import gettext_lazy as _
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
+from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
 from kospm.identity.entrypoints.forms import AdminLoginForm
 from kospm.identity.models import User
@@ -35,7 +38,11 @@ OWNER_ACCOUNT_FIELDS = (
 
 
 @admin.register(User)
-class KosPMUserAdmin(UserAdmin[User]):
+class KosPMUserAdmin(UserAdmin[User], UnfoldModelAdmin):
+    # unfold's forms: the same fields, styled like the rest of the back office.
+    form = UserChangeForm
+    add_form = UserCreationForm
+    change_password_form = AdminPasswordChangeForm
     list_display = ("username", "email", "account_status", "is_staff", "is_active")
     list_filter = ("account_status", "is_staff", "is_superuser", "is_active")
 
@@ -62,3 +69,12 @@ class KosPMUserAdmin(UserAdmin[User]):
 
 def _is_owner_account(user: User | None) -> bool:
     return user is not None and user.account_id is not None
+
+
+# Django registers groups with its own GroupAdmin; register them again with unfold's look.
+admin.site.unregister(Group)
+
+
+@admin.register(Group)
+class KosPMGroupAdmin(GroupAdmin, UnfoldModelAdmin):
+    pass

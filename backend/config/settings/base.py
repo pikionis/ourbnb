@@ -27,6 +27,8 @@ if _DOTENV.is_file():
 # --- Applications ------------------------------------------------------------------------------
 
 INSTALLED_APPS = [
+    # The back office's look (django-unfold); it must come before the admin it restyles.
+    "unfold",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -217,6 +219,55 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 # The owner portal's stylesheet (ADR 0017).
 STATICFILES_DIRS = [BASE_DIR / "static"]
+
+# --- The back office's look (django-unfold, ADR 0006) --------------------------------------------
+
+# Which installation this is: staging, production, or a developer's machine (deploy/setup_host.sh
+# writes it to the environment file). The back office shows it, so staging is never mistaken for
+# production.
+KOSPM_ENV = env.str("KOSPM_ENV", default="development")
+
+UNFOLD = {
+    "SITE_TITLE": "OurBnb",
+    "SITE_HEADER": "OurBnb",
+    "SITE_SUBHEADER": _("Back office"),
+    "SITE_SYMBOL": "villa",
+    "SITE_URL": "/",
+    "ENVIRONMENT": "config.backoffice.environment_label",
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": False,
+    "SIDEBAR": {"show_search": True, "show_all_applications": True},
+    # The site's colours: "sea" teal for actions, warm greys for the rest. Shade 600 is the
+    # button colour, dark enough for white text (WCAG AA).
+    "COLORS": {
+        "primary": {
+            "50": "#eef9f8",
+            "100": "#e5f5f3",
+            "200": "#c4eae5",
+            "300": "#9ad9d1",
+            "400": "#6cc6bc",
+            "500": "#2b8a80",
+            "600": "#1f6f67",
+            "700": "#1a5a54",
+            "800": "#164a45",
+            "900": "#123d39",
+            "950": "#0b2725",
+        },
+        "base": {
+            "50": "#faf9f8",
+            "100": "#f2f0ee",
+            "200": "#ece7e2",
+            "300": "#d9d2cc",
+            "400": "#a8a09a",
+            "500": "#7a726d",
+            "600": "#5e5753",
+            "700": "#3f3a37",
+            "800": "#2f2b2a",
+            "900": "#221f1e",
+            "950": "#151313",
+        },
+    },
+}
 
 # Uploaded files (signed contracts, property photos). In production they are not served publicly
 # (contracts hold personal data); serving through an authenticated view is part of Phase 7.

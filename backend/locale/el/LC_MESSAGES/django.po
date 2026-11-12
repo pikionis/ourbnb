@@ -1375,3 +1375,252 @@ msgstr "Χωρίς πρόσβαση"
 
 msgid "This page is not open to this login."
 msgstr "Αυτή η σελίδα δεν είναι διαθέσιμη σε αυτή τη σύνδεση."
+
+msgid "Back office"
+msgstr "Διαχείριση"
+
+msgid "Staging"
+msgstr "Δοκιμαστικό"
+
+msgid "Development"
+msgstr "Ανάπτυξη"
+
+msgid "Welcome back to"
+msgstr "Καλώς ήρθατε στο"
+
+msgid "Return to site"
+msgstr "Επιστροφή στο site"
+
+msgid "Add new item"
+msgstr "Νέα εγγραφή"
+
+msgid "Add row"
+msgstr "Προσθήκη γραμμής"
+
+msgid "All applications"
+msgstr "Όλες οι ενότητες"
+
+msgid "Apply Filters"
+msgstr "Εφαρμογή φίλτρων"
+
+msgid "Available shortcuts"
+msgstr "Διαθέσιμες συντομεύσεις"
+
+msgid "Cancel"
+msgstr "Ακύρωση"
+
+msgid "Change History"
+msgstr "Ιστορικό αλλαγών"
+
+msgid "Changelist shortcuts"
+msgstr "Συντομεύσεις λίστας"
+
+msgid "Changes"
+msgstr "Αλλαγές"
+
+msgid "Changed by"
+msgstr "Αλλαγή από"
+
+msgid "Choose file to upload"
+msgstr "Επιλέξτε αρχείο"
+
+msgid "Collapse"
+msgstr "Σύμπτυξη"
+
+msgid "Command tool shortcuts"
+msgstr "Συντομεύσεις αναζήτησης"
+
+msgid "Create new record"
+msgstr "Νέα εγγραφή"
+
+msgid "Current file"
+msgstr "Τρέχον αρχείο"
+
+msgid "Dark"
+msgstr "Σκούρο"
+
+msgid "Date"
+msgstr "Ημερομηνία"
+
+msgid "Date from"
+msgstr "Από ημερομηνία"
+
+msgid "Date to"
+msgstr "Έως ημερομηνία"
+
+msgid "Default"
+msgstr "Προεπιλογή"
+
+msgid "Edit"
+msgstr "Επεξεργασία"
+
+msgid "Export"
+msgstr "Εξαγωγή"
+
+msgid "False"
+msgstr "Όχι"
+
+msgid "Filters"
+msgstr "Φίλτρα"
+
+msgid "From"
+msgstr "Από"
+
+msgid "General"
+msgstr "Γενικά"
+
+msgid "Global shortcuts"
+msgstr "Γενικές συντομεύσεις"
+
+msgid "Go back"
+msgstr "Πίσω"
+
+msgid "Group"
+msgstr "Ομάδα"
+
+msgid "Group permissions"
+msgstr "Δικαιώματα ομάδας"
+
+msgid "Hide counts"
+msgstr "Απόκρυψη πλήθους"
+
+msgid "Image preview"
+msgstr "Προεπισκόπηση εικόνας"
+
+msgid "Light"
+msgstr "Ανοιχτό"
+
+msgid "Manage group"
+msgstr "Διαχείριση ομάδας"
+
+msgid "Manage user"
+msgstr "Διαχείριση χρήστη"
+
+msgid "Name"
+msgstr "Όνομα"
+
+msgid "Navigate"
+msgstr "Πλοήγηση"
+
+msgid "New"
+msgstr "Νέο"
+
+msgid "Next"
+msgstr "Επόμενο"
+
+msgid "No data"
+msgstr "Δεν υπάρχουν δεδομένα"
+
+msgid "No results found"
+msgstr "Δεν βρέθηκαν αποτελέσματα"
+
+msgid "Nothing matched your search"
+msgstr "Τίποτα δεν ταιριάζει με την αναζήτηση"
+
+msgid "Object permissions"
+msgstr "Δικαιώματα αντικειμένου"
+
+msgid "Open command tool"
+msgstr "Άνοιγμα αναζήτησης"
+
+msgid "Open selection"
+msgstr "Άνοιγμα επιλογής"
+
+msgid "Open selection in new tab"
+msgstr "Άνοιγμα επιλογής σε νέα καρτέλα"
+
+msgid "Open shortcuts list"
+msgstr "Λίστα συντομεύσεων"
+
+msgid "Previous"
+msgstr "Προηγούμενο"
+
+msgid "Recent searches"
+msgstr "Πρόσφατες αναζητήσεις"
+
+msgid "Reset filters"
+msgstr "Καθαρισμός φίλτρων"
+
+msgid "Reset to default"
+msgstr "Επαναφορά προεπιλογής"
+
+msgid "Row"
+msgstr "Γραμμή"
+
+msgid "Run"
+msgstr "Εκτέλεση"
+
+msgid "Search apps and models..."
+msgstr "Αναζήτηση ενοτήτων…"
+
+msgid "Select"
+msgstr "Επιλογή"
+
+msgid "Select action"
+msgstr "Επιλογή ενέργειας"
+
+msgid "Select action to run"
+msgstr "Επιλέξτε ενέργεια"
+
+msgid "Select all objects on this page for an action"
+msgstr "Επιλογή όλων στη σελίδα"
+
+msgid "Select record"
+msgstr "Επιλογή εγγραφής"
+
+msgid "Select value"
+msgstr "Επιλογή τιμής"
+
+msgid "Show counts"
+msgstr "Εμφάνιση πλήθους"
+
+msgid "Submit"
+msgstr "Υποβολή"
+
+msgid "System"
+msgstr "Σύστημα"
+
+msgid "This item will be deleted."
+msgstr "Η εγγραφή θα διαγραφεί."
+
+msgid "This page yielded into no results."
+msgstr "Η σελίδα δεν έχει αποτελέσματα."
+
+msgid "To"
+msgstr "Έως"
+
+msgid "Toggle dark/light mode"
+msgstr "Σκούρο ή ανοιχτό θέμα"
+
+msgid "Toggle filter"
+msgstr "Φίλτρα"
+
+msgid "Toggle password visibility"
+msgstr "Εμφάνιση ή απόκρυψη κωδικού"
+
+msgid "Toggle sidebar"
+msgstr "Εμφάνιση ή απόκρυψη μενού"
+
+msgid "True"
+msgstr "Ναι"
+
+msgid "Type to search"
+msgstr "Πληκτρολογήστε για αναζήτηση"
+
+msgid "Update"
+msgstr "Ενημέρωση"
+
+msgid "User permissions"
+msgstr "Δικαιώματα χρήστη"
+
+msgid "Value"
+msgstr "Τιμή"
+
+msgid "You have been successfully logged out from the administration"
+msgstr "Αποσυνδεθήκατε από τη διαχείριση"
+
+msgid "next"
+msgstr "επόμενο"
+
+msgid "previous"
+msgstr "προηγούμενο"

@@ -20,6 +20,8 @@ from django.utils.html import format_html, format_html_join
 from django.utils.safestring import SafeString
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
+from unfold.admin import TabularInline as UnfoldTabularInline
 
 from kospm.bootstrap import get_bus, invite_owner_to_portal, property_defaults
 from kospm.properties import models
@@ -89,7 +91,7 @@ def badge(text: str, colour: str) -> SafeString:
     )
 
 
-class CommandModelAdmin[M: models.Owner | models.Property](admin.ModelAdmin[M]):
+class CommandModelAdmin[M: models.Owner | models.Property](UnfoldModelAdmin, admin.ModelAdmin[M]):
     """Shared behaviour: refusals reported on the form page, nothing deletable."""
 
     def changeform_view(
@@ -113,7 +115,7 @@ class CommandModelAdmin[M: models.Owner | models.Property](admin.ModelAdmin[M]):
 # --- owners --------------------------------------------------------------------------------------
 
 
-class PropertyInline(admin.TabularInline[models.Property, models.Owner]):
+class PropertyInline(UnfoldTabularInline, admin.TabularInline[models.Property, models.Owner]):
     model = models.Property
     fields = ("code", "name", "status_badge")
     readonly_fields = ("code", "name", "status_badge")

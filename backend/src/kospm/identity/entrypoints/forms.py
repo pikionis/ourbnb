@@ -14,6 +14,7 @@ from django.contrib.auth import get_user_model, password_validation
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+from unfold.forms import AuthenticationForm as UnfoldAuthenticationForm
 
 from kospm.bootstrap import portal_throttle
 from kospm.identity.adapters.queries import is_unconfirmed_login
@@ -143,7 +144,7 @@ class OwnerLoginForm(AuthenticationForm):
         return super().get_invalid_login_error()
 
 
-class AdminLoginForm(AdminAuthenticationForm):
+class AdminLoginForm(UnfoldAuthenticationForm, AdminAuthenticationForm):
     """The Django admin's login, throttled per username and per visitor: `/admin/` is the first
     address bots try (ADR 0021). It says the same words as the portal when it refuses."""
 

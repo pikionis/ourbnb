@@ -20,6 +20,7 @@ from django.utils.html import format_html
 from django.utils.safestring import SafeString
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy, ngettext
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 
 from kospm.bootstrap import get_bus
 from kospm.reservations import models
@@ -69,7 +70,7 @@ def badge(text: str, colour: str) -> SafeString:
 
 
 class _CommandsOnly[M: models.Reservation | models.WaitingCalendarEvent | models.CalendarFeed](
-    admin.ModelAdmin[M]
+    UnfoldModelAdmin, admin.ModelAdmin[M]
 ):
     """Refusals are reported on the form's page, and nothing is deletable."""
 
